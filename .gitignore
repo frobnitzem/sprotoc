@@ -1,0 +1,6 @@
+*.o
+*.a
+bin/sprotoc
+test/test1
+*.pb-c.c
+*.pb-c.h
