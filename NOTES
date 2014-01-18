@@ -5,3 +5,10 @@ if the same required message is read > 1x.
 Because of that, I didn't have the heart to count the required
 fields and check -- so it's not checked.
 
+
+To generate stubs, set the 'stubs' parameter on calling sprotoc,
+like so:
+
+sprotoc --c_out=stubs=stub:. test1.proto
+ -> generates stub.c and stub.h
+    along with the usual test1.pb-c.c and test1.pb-c.h

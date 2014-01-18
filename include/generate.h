@@ -1,6 +1,7 @@
 // Protocol Buffers - Google's data interchange format
+// Copyright 2014 David M. Rogers
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+//   modified form of: http://code.google.com/p/protobuf/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -28,15 +29,17 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Author: kenton@google.com (Kenton Varda)
-//  Based on original Protocol Buffers design by
-//  Sanjay Ghemawat, Jeff Dean, and others.
+// Author: David M. Rogers (predictivestatmech@gmail.com)
+//  Based on C++-generator by
+//  Kenton Varda, kenton@google.com
+//    Based on original Protocol Buffers design by
+//    Sanjay Ghemawat, Jeff Dean, and others.
 //
-// Generates C++ code for a given .proto file.
+// Generates Stack-based C code for a given .proto file.
 
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_C_GENERATOR_H__
-#define GOOGLE_PROTOBUF_COMPILER_C_GENERATOR_H__
+#ifndef SPROTOC_C_GEN_API_H__
+#define SPROTOC_C_GEN_API_H__
 
 #include <string>
 #include <vector>
@@ -75,7 +78,10 @@ class LIBPROTOC_EXPORT CGenerator : public CodeGenerator {
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(CGenerator);
 };
 
-typedef bool Options;
+typedef struct {
+    bool gen_stubs;
+    string stub_prefix;
+} Options;
 
 class FileGenerator {
  public:
@@ -84,16 +90,20 @@ class FileGenerator {
                          const Options& options);
   ~FileGenerator();
 
-  void GenerateHeader(io::Printer* printer);
+  void GenerateHeader(io::Printer* printer, string incname);
   void GenerateSource(io::Printer* printer);
+  void GenerateStubHeader(io::Printer* printer, string basename);
+  void GenerateStubSource(io::Printer* printer, string basename);
 
+  void decl_api(io::Printer *printer, const Descriptor *msg);
+  void gen_api(io::Printer *printer, const Descriptor *msg);
+  void gen_stub_hdr(io::Printer *printer, const Descriptor *msg);
+  void gen_stub(io::Printer *printer, const Descriptor *msg);
+
+  /* declares.cc */
   void fwd_declare_struct(io::Printer *printer, const Descriptor *msg);
-  void declare_struct(io::Printer *printer, const Descriptor *msg);
   void declare_enum(io::Printer *printer, const EnumDescriptor *ent);
-  void declare_api(io::Printer *printer, const Descriptor *msg);
-  void declare_top_api(io::Printer *printer, const Descriptor *msg);
-  void generate_api(io::Printer *printer, const Descriptor *msg);
-  void generate_top_api(io::Printer *printer, const Descriptor *msg);
+  void declare_struct(io::Printer *printer, const Descriptor *msg);
 
  private:
   const FileDescriptor* file_;
@@ -106,6 +116,29 @@ class FileGenerator {
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FileGenerator);
 };
+
+/* gen_api.cc */
+void declare_top_api(io::Printer *printer, const Descriptor *msg);
+void generate_top_api(io::Printer *printer, const Descriptor *msg);
+
+void declare_api(io::Printer *printer, const Descriptor *msg);
+void generate_api(io::Printer *printer, const Descriptor *msg);
+void generate_stub(io::Printer *printer, const Descriptor *msg);
+
+/* declares.cc */
+void declare_field(io::Printer *printer, const FieldDescriptor* field);
+
+void declare_stackspace(io::Printer *printer, const FieldDescriptor *field);
+void set_stackspace(io::Printer *printer, const FieldDescriptor *field);
+
+/* gens.cc */
+void generate_init_call(io::Printer *printer, const FieldDescriptor* field);
+void generate_write_call(io::Printer *printer, const FieldDescriptor* field);
+void generate_read_case(io::Printer *printer, const FieldDescriptor* field);
+void generate_size_call(io::Printer *printer, const FieldDescriptor* field);
+void generate_copy_in(io::Printer *printer, const FieldDescriptor* field);
+void generate_struct_len(io::Printer *printer, const FieldDescriptor* field);
+void generate_copy_out(io::Printer *printer, const FieldDescriptor* field);
 
 }  // namespace ansi_c
 }  // namespace compiler

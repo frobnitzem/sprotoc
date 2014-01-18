@@ -8,7 +8,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
   google::protobuf::compiler::CommandLineInterface cli;
 
-  cli.SetVersionInfo("C Language - v0.1");
+  cli.SetVersionInfo("C Language - v0.5");
 
   // Support generation of C++ source and headers.
   google::protobuf::compiler::cpp::CppGenerator cpp_generator;

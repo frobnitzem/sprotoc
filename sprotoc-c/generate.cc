@@ -33,35 +33,52 @@ bool CGenerator::Generate(const FileDescriptor* file,
   vector<pair<string, string> > options;
   ParseGeneratorParameter(parameter, &options);
   Options file_options;
-  /*for (int i = 0; i < options.size(); i++) {
-    if (options[i].first == "dllexport_decl") {
-      file_options.dllexport_decl = options[i].second;
-    } else if (options[i].first == "safe_boundary_check") {
-      file_options.safe_boundary_check = true;
+  file_options.gen_stubs = false;
+  for (int i = 0; i < options.size(); i++) {
+    if (options[i].first == "stubs") {
+      file_options.stub_prefix = options[i].second;
+      file_options.gen_stubs = true;
     } else {
       *error = "Unknown generator option: " + options[i].first;
       return false;
     }
-  }*/
+  }
 
   string basename = StripProto(file->name());
-  basename.append(".pb-c");
   FileGenerator file_generator(file, file_options);
 
   // Generate header.
   {
+    string incname = basename;
+    if(file_options.gen_stubs)
+        incname = file_options.stub_prefix;
     scoped_ptr<io::ZeroCopyOutputStream> output(
-      generator_context->Open(basename + ".h"));
+      generator_context->Open(basename + ".pb-c.h"));
     io::Printer printer(output.get(), '$');
-    file_generator.GenerateHeader(&printer);
+    file_generator.GenerateHeader(&printer, incname);
   }
 
   // Generate cc file.
   {
     scoped_ptr<io::ZeroCopyOutputStream> output(
-      generator_context->Open(basename + ".c"));
+      generator_context->Open(basename + ".pb-c.c"));
     io::Printer printer(output.get(), '$');
     file_generator.GenerateSource(&printer);
+  }
+
+  // Generate stubs
+  if(file_options.gen_stubs) {
+    {
+    scoped_ptr<io::ZeroCopyOutputStream> output(
+      generator_context->Open(file_options.stub_prefix + ".h"));
+    io::Printer printer(output.get(), '$');
+    file_generator.GenerateStubHeader(&printer, basename);
+    /**/}{/**/
+    scoped_ptr<io::ZeroCopyOutputStream> output(
+      generator_context->Open(file_options.stub_prefix + ".c"));
+    io::Printer printer(output.get(), '$');
+    file_generator.GenerateStubSource(&printer, basename);
+    }
   }
 
   return true;
@@ -77,7 +94,7 @@ FileGenerator::FileGenerator(const FileDescriptor* file,
 
 FileGenerator::~FileGenerator() {}
 
-void FileGenerator::GenerateHeader(io::Printer* printer) {
+void FileGenerator::GenerateHeader(io::Printer* printer, string incname) {
   string filename_identifier = FilenameIdentifier(file_->name());
 
   // Generate top of header.
@@ -94,8 +111,8 @@ void FileGenerator::GenerateHeader(io::Printer* printer) {
     "#include <stdint.h>\n"
     "#include <stdint.h>\n"
     "#include \"sprotoc/sprotoc.h\"\n"
-    "#include \"$basename$.h\"\n", 
-        "basename", StripProto(file_->name()));
+    "#include \"$incname$.h\"\n", 
+        "incname", incname);
   for (int i = 0; i < file_->dependency_count(); i++) {
     printer->Print(
       "#include \"$dependency$.pb-c.h\"\n",
@@ -111,36 +128,38 @@ void FileGenerator::GenerateHeader(io::Printer* printer) {
     "#define DEBUG_MSG(...) DEBUG_MSG2(__FILE__, __LINE__, __VA_ARGS__)\n"
     "// @@protoc_insertion_point(includes)\n\n");
 
+  // Generate top-level enum definitions.
+  for (int i = 0; i < file_->enum_type_count(); i++) {
+    declare_enum(printer, file_->enum_type(i));
+  }
   // Generate forward declarations of structs and scoped enums
   for (int i = 0; i < file_->message_type_count(); i++) {
     fwd_declare_struct(printer, file_->message_type(i));
   }
   printer->Print("\n");
-
-  // Generate top-level enum definitions.
-  for (int i = 0; i < file_->enum_type_count(); i++) {
-    declare_enum(printer, file_->enum_type(i));
-  }
-  printer->Print(kThickSeparator);
+  printer->Print(kThinSeparator);
   printer->Print("\n");
 
   // Generate actual struct declarations
   for (int i = 0; i < file_->message_type_count(); i++) {
     declare_struct(printer, file_->message_type(i));
   }
+  printer->Print("\n");
+  printer->Print(kThickSeparator);
+  printer->Print("\n");
 
   // Generate API definitions.
   for (int i = 0; i < file_->message_type_count(); i++) {
-    printer->Print("\n");
-    printer->Print(kThickSeparator);
-    printer->Print("\n");
+    if(i > 0) {
+        printer->Print("\n");
+        printer->Print(kThinSeparator);
+        printer->Print("\n");
+    }
     declare_top_api(printer, file_->message_type(i));
-    declare_api(printer, file_->message_type(i));
   }
-
-  /*printer->Print("\n");
-  printer->Print(kThickSeparator);
-  printer->Print("\n");*/
+  for (int i = 0; i < file_->message_type_count(); i++) {
+    decl_api(printer, file_->message_type(i));
+  }
 
   if (file_->service_count() > 0) {
     printer->Print(
@@ -158,440 +177,117 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     "// source: $filename$\n\n"
     "#include <stdlib.h>\n"
     "#include <string.h>\n"
-    "#include \"$basename$.pb-c.h\"\n"
-    "extern const rbop_t fszops;\n",
-    "filename", file_->name(),
-    "basename", StripProto(file_->name()));
+    "#include \"$basename$.pb-c.h\"\n\n"
+    "extern const rbop_t fszops;\n\n",
+        "filename", file_->name(),
+        "basename", StripProto(file_->name()));
 
-  printer->Print("\n");
-  printer->Print(kThickSeparator);
-  printer->Print("\n");
+    for (int i = 0; i < file_->message_type_count(); i++) {
+        if(i > 0) {
+            printer->Print("\n");
+            printer->Print(kThinSeparator);
+            printer->Print("\n");
+        }
+        generate_top_api(printer, file_->message_type(i));
+    }
+    for (int i = 0; i < file_->message_type_count(); i++) {
+        gen_api(printer, file_->message_type(i));
+    }
+    if (file_->service_count() > 0) {
+        printer->Print("#warning Generic Services Not Implemented\n");
+    }
+
+    /* Define extensions.
+    for (int i = 0; i < file_->extension_count(); i++) {
+        extension_generators_[i]->GenerateDefinition(printer);
+    }*/
+}
+
+void FileGenerator::GenerateStubHeader(io::Printer* printer, string basename) {
+  printer->Print(
+    "// Example header for reading and writing from/to protobufs - do edit!\n"
+    "// source: $filename$\n\n"
+    "#include <stdint.h>\n"
+    "\n"
+    "// This is included at the top of $basename$.pb-c.h,\n"
+    "//   and can re-define all MY_... symbols.\n"
+    "// -- Here we define them to use the auto-generated data structure.\n",
+        "filename", file_->name(),
+        "basename", basename);
+    for(int i = 0; i < file_->message_type_count(); i++) {
+        gen_stub_hdr(printer, file_->message_type(i));
+    }
+}
+
+void FileGenerator::GenerateStubSource(io::Printer* printer, string basename) {
+  printer->Print(
+    "// Example code for reading and writing from/to protobufs - do edit!\n"
+    "// source: $filename$\n\n"
+    "#include <stdio.h>\n"
+    "#include <string.h>\n"
+    "#include <stdlib.h>\n"
+    "#include <stdint.h>\n"
+    "\n"
+    "#include \"$basename$.pb-c.h\"\n\n",
+    "filename", file_->name(),
+    "basename", basename);
+
+  printer->Print(
+    "int main(int argc, char **argv) {\n"
+    "    Allocator *l = allocator_ctor();\n"
+    "    $full_name$ test = {}; // TODO: initialize something useful\n"
+    "    $full_name$ *ret;\n"
+    "    size_t len;\n"
+    "    uint8_t *buf;\n"
+    "\n"
+    "    if( (buf = $full_name$_to_string(&len, &test)) == NULL) {\n"
+    "        fprintf(stderr, \"Error writing test data.\\n\");\n"
+    "        return 1;\n"
+    "    }\n"
+    "    ret = read_$full_name$(buf, len, l);\n"
+    "    free(buf);\n"
+    "    if(ret == NULL) {\n"
+    "        return 1;\n"
+    "    }\n"
+    "\n"
+    "    printf(\"Read test data to %p\\n\", ret); // TODO: show some result fields\n"
+    "\n"
+    "    allocator_dtor(&l);\n"
+    "    return 0;\n"
+    "}\n", "full_name",
+      DotsToUnderscores(file_->message_type(0)->full_name()));
 
   for (int i = 0; i < file_->message_type_count(); i++) {
-      generate_top_api(printer, file_->message_type(i));
-
-      printer->Print("\n");
-      printer->Print(kThinSeparator);
-      printer->Print("\n");
-
-      generate_api(printer, file_->message_type(i));
+      gen_stub(printer, file_->message_type(i));
   }
   if (file_->service_count() > 0) {
     printer->Print(
       "#warning Generic Services Not Implemented\n");
   }
-
-  /* Define extensions.
-  for (int i = 0; i < file_->extension_count(); i++) {
-    extension_generators_[i]->GenerateDefinition(printer);
-  }*/
 }
 
-void declare_field(io::Printer *printer, const FieldDescriptor* field) {
-  string repstar = "";
-  if (field->is_repeated()) {
-      printer->Print("    int n_$name$;\n", "name", field->name());
-      repstar = "*";
-  } else if (field->is_optional()) {
-      printer->Print("    unsigned has_$name$;\n", "name", field->name());
-  }
-  switch (field->cpp_type()) {
-      case FieldDescriptor::CPPTYPE_MESSAGE:
-        { const Descriptor *submsg = field->message_type();
-        printer->Print("    MY_$type$ $rep$*$name$;\n",
-                        "rep", repstar,
-                        "type", DotsToUnderscores(submsg->full_name()),
-                        "name", field->name());
-        }
-        return;
-      case FieldDescriptor::CPPTYPE_STRING:
-        switch (field->options().ctype()) {
-          default:  // RepeatedStringFieldGenerator handles unknown ctypes.
-          case FieldOptions::STRING:
-            printer->Print("    int $rep$len_$name$;\n",
-                      "rep", repstar,
-                      "name", field->name());
-            printer->Print("    char $rep$*$name$;\n",
-                      "rep", repstar,
-                      "name", field->name());
-            return;
-        }
-      case FieldDescriptor::CPPTYPE_ENUM:
-        printer->Print("    enum $type$ $rep$$name$;\n",
-                      "rep", repstar,
-                      "type", DotsToUnderscores(
-                                field->enum_type()->full_name()),
-                      "name", field->name());
-        return;
-      default: // primitive field
-        printer->Print("    $type$ $rep$$name$;\n",
-                      "rep", repstar,
-                      "type", CTName(field->type()),
-                      "name", field->name());
-        return;
-  }
-}
-
-//"    r.n_child = 0;\n"
-//"    r.has_i = 0; //(etc.)\n"
-void generate_init_call(io::Printer *printer, const FieldDescriptor* field) {
-  char def[32];
-
-  if(field->is_optional())
-      printer->Print("    r->has_$name$ = 0;\n", "name", field->name());
-  if(field->is_repeated())
-      printer->Print("    r->n_$name$ = 0;\n", "name", field->name());
-
-  if(! field->has_default_value() || field->is_optional()) {
-      return;
-  }
-
-  switch(field->cpp_type()) {
-  case FieldDescriptor::CPPTYPE_DOUBLE:
-      snprintf(def, sizeof(def), "%f", field->default_value_double());
-      break;
-  case FieldDescriptor::CPPTYPE_FLOAT:
-      snprintf(def, sizeof(def), "%f", field->default_value_float());
-      break;
-  case FieldDescriptor::CPPTYPE_INT64:
-      snprintf(def, sizeof(def), "%lld", field->default_value_int64());
-      break;
-  case FieldDescriptor::CPPTYPE_UINT64:
-      snprintf(def, sizeof(def), "%llu", field->default_value_uint64());
-      break;
-  case FieldDescriptor::CPPTYPE_INT32:
-      snprintf(def, sizeof(def), "%d", field->default_value_int32());
-      break;
-  case FieldDescriptor::CPPTYPE_UINT32:
-      snprintf(def, sizeof(def), "%u", field->default_value_uint32());
-      break;
-  case FieldDescriptor::CPPTYPE_BOOL:
-      snprintf(def, sizeof(def), "%lld", field->default_value_int64());
-      break;
-  case FieldDescriptor::CPPTYPE_STRING:
-      snprintf(def, sizeof(def), "%lu", field->default_value_string().length());
-      printer->Print("    r->$name$ = def_$name$;\n"
-                     "    r->len_$name$ = $num$;\n",
-                             "name", field->name(), "num", def);
-      return;
-  case FieldDescriptor::CPPTYPE_ENUM:
-      printer->Print("    r->$name$ = $def$;\n", "name", field->name(), "def",
-          DotsToUnderscores(field->default_value_enum()->full_name()));
-      return;
-  }
-  printer->Print("    r->$name$ = $def$;\n", "name", field->name(), "def", def);
-
-  return;
-}
-
-//"        case 1:\n"
-//"            if((tag & 7) != 0) goto skip; // check wire type for errors\n"
-//"            READ_PRIM(uint32_t, i);\n"
-//"            nreqd++;\n" // incr for required fields [FIXME]
-void generate_read_case(io::Printer *printer, const FieldDescriptor* field) {
-  char num[32];
-  string read_type;
-  snprintf(num, sizeof(num), "%d", field->number());
-  printer->Print("        case $num$:\n", "num", num);
-
-  if(field->is_repeated()) {
-      if(field->is_packable() && field->options().packed()) {
-          printer->Print("            if((tag & 7) != 2) goto skip;\n");
-          printer->Print("            READ_REP_PACKED($type$, $name$);\n",
-                        "type", GTName(field->type()),
-                        "name", field->name());
-          goto skip;
-      } else {
-          read_type = "READ_REP";
-      }
-  } else {
-          read_type = "READ";
-  }
-
-  num[1] = 0;
-  switch(field->type()) {
-  case FieldDescriptor::TYPE_DOUBLE:
-  case FieldDescriptor::TYPE_FIXED64:
-  case FieldDescriptor::TYPE_SFIXED64:
-      num[0] = '1'; break;
-  case FieldDescriptor::TYPE_FLOAT:
-  case FieldDescriptor::TYPE_FIXED32:
-  case FieldDescriptor::TYPE_SFIXED32:
-      num[0] = '5'; break;
-  case FieldDescriptor::TYPE_INT64:
-  case FieldDescriptor::TYPE_UINT64:
-  case FieldDescriptor::TYPE_INT32:
-  case FieldDescriptor::TYPE_BOOL:
-  case FieldDescriptor::TYPE_UINT32:
-  case FieldDescriptor::TYPE_ENUM:
-  case FieldDescriptor::TYPE_SINT32:
-  case FieldDescriptor::TYPE_SINT64:
-      num[0] = '0'; break;
-  case FieldDescriptor::TYPE_STRING:
-  case FieldDescriptor::TYPE_MESSAGE:
-  case FieldDescriptor::TYPE_BYTES:
-      num[0] = '2'; break;
-  case FieldDescriptor::TYPE_GROUP: // deprecated.
-      num[0] = '3'; break;
-  }
-  printer->Print("            if((tag & 7) != $num$) goto skip;\n", "num", num);
-  
-  switch (field->cpp_type()) {
-  case FieldDescriptor::CPPTYPE_MESSAGE:
-        { const Descriptor *submsg = field->message_type();
-        printer->Print("            $rt$_MSG($type$, $name$);\n",
-                        "rt", read_type,
-                        "type", DotsToUnderscores(submsg->full_name()),
-                        "name", field->name());
-        }
-        break;
-  case FieldDescriptor::CPPTYPE_STRING:
-        printer->Print("            $rt$_STRING($name$);\n",
-                      "rt", read_type,
-                      "name", field->name());
-        break;
-  //case FieldDescriptor::CPPTYPE_ENUM: // Note: enum range not validated.
-  default: // primitive field
-        printer->Print("            $rt$_PRIM($type$, $name$);\n",
-                      "rt", read_type,
-                      "type", GTName(field->type()),
-                      "name", field->name());
-        break;
-  }
-  if (field->is_optional()) {
-      printer->Print("            r.has_$name$ = 1;\n", "name", field->name());
-  }
-
-skip:
-  if(field->is_required()) {
-      printer->Print("            nreqd++;\n");
-  }
-}
-
-void generate_size_call(io::Printer *printer, const FieldDescriptor* field) {
-  //char sz[32];
-  char line[320];
-  string r_type;
-
-  printer->Print("    ");
-  if(field->is_repeated()) {
-      if(field->is_packable() && field->options().packed()) {
-          printer->Print("SIZE_REP_PACKED($type$, $name$);\n",
-                        "type", GTName(field->type()),
-                        "name", field->name());
-          return;
-      } else {
-          r_type = "SIZE_REP";
-      }
-  } else {
-      if(field->is_optional())
-          printer->Print("if(r.has_$name$) ", "name", field->name());
-
-      r_type = "SIZE";
-  }
-
-  switch (field->cpp_type()) {
-  case FieldDescriptor::CPPTYPE_MESSAGE:
-        { const Descriptor *submsg = field->message_type();
-        snprintf(line, sizeof(line), "%s_MSG(%s, %s, %d, %d);\n",
-                r_type.c_str(), DotsToUnderscores(submsg->full_name()).c_str(),
-                field->name().c_str(),
-                field->number(), varint_sz(field->number() << 3));
-        printer->Print(line);
-        }
-        break;
-  case FieldDescriptor::CPPTYPE_STRING:
-        snprintf(line, sizeof(line), "%d",  varint_sz(field->number() << 3));
-        printer->Print("$rt$_STRING($name$, $sz$);\n",
-                      "rt", r_type,
-                      "name", field->name(),
-                      "sz", line);
-        break;
-  //case FieldDescriptor::CPPTYPE_ENUM: // not validated.
-  default: // primitive field
-        snprintf(line, sizeof(line), "%s_PRIM(%s, %s, %d);\n",
-           r_type.c_str(), GTName(field->type()).c_str(), field->name().c_str(),
-           varint_sz(field->number() << 3));
-        printer->Print(line);
-        break;
-  }
-  return;
-}
-
-void generate_write_call(io::Printer *printer, const FieldDescriptor* field) {
-  char line[320];
-  string r_type;
-
-  printer->Print("    ");
-  if(field->is_repeated()) {
-      if(field->is_packable() && field->options().packed()) {
-          snprintf(line, sizeof(line), "%d", field->number());
-          printer->Print("WRITE_REP_PACKED($type$, $name$, $num$);\n",
-                        "type", GTName(field->type()),
-                        "name", field->name(),
-                        "num", line);
-          return;
-      } else {
-          r_type = "WRITE_REP";
-      }
-  } else {
-      if(field->is_optional())
-          printer->Print("if(r.has_$name$) ", "name", field->name());
-
-      r_type = "WRITE";
-  }
-
-  switch (field->cpp_type()) {
-  case FieldDescriptor::CPPTYPE_MESSAGE:
-        { const Descriptor *submsg = field->message_type();
-        snprintf(line, sizeof(line), "%s_MSG(%s, %s, %d);\n",
-                    r_type.c_str(),
-                    DotsToUnderscores(submsg->full_name()).c_str(),
-                    field->name().c_str(), field->number());
-        }
-        break;
-  case FieldDescriptor::CPPTYPE_STRING:
-        snprintf(line, sizeof(line), "%s_STRING(%s, %d);\n",
-                    r_type.c_str(),
-                    field->name().c_str(), field->number());
-        break;
-  default: // primitive field
-        snprintf(line, sizeof(line), "%s_PRIM(%s, %s, %d);\n",
-                    r_type.c_str(),
-                    GTName(field->type()).c_str(),
-                    field->name().c_str(), field->number());
-        break;
-  }
-  printer->Print(line);
-
-  return;
-}
-
-void FileGenerator::declare_enum(io::Printer *printer, const EnumDescriptor *ent) {
-    const EnumValueDescriptor *val;
-    char num[32];
-    if(written.count(ent->full_name())) {
-        return;
-    }
-    written[ent->full_name()] = 1;
-    printer->Print("enum $full_name$ {\n",
-                    "full_name", DotsToUnderscores(ent->full_name()));
-    for(int i = 0; i < ent->value_count(); i++) {
-        val = ent->value(i);
-        snprintf(num, 32, "%d", val->number());
-        printer->Print("    $full_name$ = $num$,\n",
-                "full_name", DotsToUnderscores(val->full_name()),
-                "num", num);
-    }
-    printer->Print("};\n");
-}
-void declare_repstack(io::Printer *printer, const FieldDescriptor *field) {
-    if(field->is_repeated()) {
-        printer->Print("    ");
-        switch(field->cpp_type()) {
-        case FieldDescriptor::CPPTYPE_ENUM:
-            printer->Print("enum ");
-        case FieldDescriptor::CPPTYPE_MESSAGE:
-            printer->Print(
-                    "MY_$full_name$ *$name$[MAX_REPEATED];\n",
-                "full_name", DotsToUnderscores(field->message_type()
-                                ->full_name()), "name", field->name());
-            break;
-        case FieldDescriptor::CPPTYPE_STRING:
-            printer->Print(
-                "    char *$name$[MAX_REPEATED];\n"
-                "    int *len_$name$[MAX_REPEATED];\n",
-                        "name", field->name());
-            break;
-        default:
-            break;
-        }
-        printer->Print("    r.$name$ = $name$;\n",
-                        "name", field->name());
-    }
-}
-void FileGenerator::fwd_declare_struct(io::Printer *printer, const Descriptor *msg) {
-    if(written.count(msg->full_name())) {
-        return;
-    }
-    written[msg->full_name()] = 1;
-
-    printer->Print("typedef struct $full_name$ $full_name$;\n",
-            "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        const FieldDescriptor* field = msg->field(i);
-        switch(field->cpp_type()) {
-        default:
-            continue;
-        case FieldDescriptor::CPPTYPE_MESSAGE:
-            fwd_declare_struct(printer, field->message_type());
-            continue;
-        case FieldDescriptor::CPPTYPE_ENUM:
-            declare_enum(printer, field->enum_type());
-            continue;
-        }
-    }
-}
-void FileGenerator::declare_struct(io::Printer *printer, const Descriptor *msg) {
-    if(written[msg->full_name()] > 1) {
-        return;
-    }
-    written[msg->full_name()] = 2;
-
-    // Scan for sub-messages here and write 'em.
-    for(int i = 0; i < msg->field_count(); i++) {
-        const FieldDescriptor* field = msg->field(i);
-        if(field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
-            declare_struct(printer, field->message_type());
-        }
-    }
-    // Print message contents only on post-tree traversal.
-    // (ensuring un-nesting)
-    printer->Print("struct $full_name$ {\n",
-            "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        declare_field(printer, msg->field(i));
-    }
-    printer->Print("};\n");
-}
-void FileGenerator::declare_api(io::Printer *printer, const Descriptor *msg) {
+// numbers 1-2 are taken by fwd_declare_struct/declare_enum and declare_struct
+void FileGenerator::decl_api(io::Printer *printer, const Descriptor *msg) {
     if(written[msg->full_name()] > 2) {
         return;
     }
     written[msg->full_name()] = 3;
 
-    printer->Print("\n");
-    printer->Print(kThinSeparator);
-    printer->Print(
-      "\nvoid protowr_$full_name$($full_name$ *out,\n"
-      "                         MY_$full_name$ *a); // user \n"
-      "MY_$full_name$ *protord_$full_name$(void *info,\n"
-      "                         $full_name$ *r); // user \n"
-      "MY_$full_name$ *read_$full_name$(const uint8_t *buf,\n"
-      "                         ssize_t sz, void *info);\n\n"
-      //"static inline void init_$full_name$($full_name$ *r);\n"
-      "struct _fszmap *size_$full_name$(Allocator *l,\n"
-      "                         MY_$full_name$ *a);\n"
-      "int write_msg_$full_name$(SWriter *s,\n"
-      "                         struct _fszmap *f,\n"
-      "                         MY_$full_name$ *a);\n",
-      "full_name", DotsToUnderscores(msg->full_name()));
     for(int i = 0; i < msg->field_count(); i++) {
         const FieldDescriptor* field = msg->field(i);
         if(field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
-            declare_api(printer, field->message_type());
+            decl_api(printer, field->message_type());
         }
     }
+
+    printer->Print("\n");
+    printer->Print(kThickSeparator);
+    printer->Print("\n");
+
+    declare_api(printer, msg);
 }
 
-// API helper functions (hide details of getting sizes before writes)
-void FileGenerator::declare_top_api(io::Printer *printer, const Descriptor *msg) {
-    printer->Print(
-        "int $full_name$_to_file(int fd, MY_$full_name$ *a);\n"
-        "uint8_t *$full_name$_to_string(size_t *len, MY_$full_name$ *a);\n",
-        "full_name", DotsToUnderscores(msg->full_name()));
-}
-void FileGenerator::generate_api(io::Printer *printer, const Descriptor *msg) {
+void FileGenerator::gen_api(io::Printer *printer, const Descriptor *msg) {
     if(written[msg->full_name()] > 3) {
         //printf("Skipping generation of %s\n", msg->full_name().c_str());
         return;
@@ -602,191 +298,52 @@ void FileGenerator::generate_api(io::Printer *printer, const Descriptor *msg) {
     for(int i = 0; i < msg->field_count(); i++) {
         const FieldDescriptor* field = msg->field(i);
         if(field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
-            generate_api(printer, field->message_type());
+            gen_api(printer, field->message_type());
         }
     }
-
-    printer->Print(
-    "static inline void init_$full_name$($full_name$ *r) {\n"
-    "    // @generated\n",
-        "full_name", DotsToUnderscores(msg->full_name()));
-    // list static default string values
-    for(int i = 0; i < msg->field_count(); i++) {
-      const FieldDescriptor* field = msg->field(i);
-      if(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING
-            && field->has_default_value() && !field->is_optional()) {
-        printer->Print(
-        "    static char def_$name$[] = \"$def$\";\n",
-            "name", field->name(),
-            "def", field->default_value_string());
-      }
-    }
-    for(int i = 0; i < msg->field_count(); i++) {
-        generate_init_call(printer, msg->field(i));
-    }
-    //"    r.n_child = 0;\n"
-    //"    r.has_i = 0; //(etc.)\n"
-    printer->Print("}\n");
-
-    printer->Print(
-    "// Create a message size tree to associate\n"
-    "// with recursively included messages.\n"
-    "struct _fszmap *size_$full_name$(Allocator *l, MY_$full_name$ *a) {\n"
-    "    $full_name$ r;\n"
-    "    struct _fszmap *f = allocate(l, sizeof(struct _fszmap));\n"
-    "    struct _fszmap *c;\n"
-    "    size_t sz = 0;\n"
-    "    // @generated\n", "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        declare_repstack(printer, msg->field(i));
-    }
-    printer->Print(
-    "    f->sub = NULL; // tree for adding sub-messages\n"
-    "\n"
-    "    init_$full_name$(&r);\n"
-    "    protowr_$full_name$(&r, a); // user's function call\n"
-    "\n"
-    "    // recursively find sizes of enclosed objects\n"
-    "    // @generated\n", "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        generate_size_call(printer, msg->field(i));
-    }
-    //"    SIZE_PRIM(uint32_t, type, 1);\n"
-    //"    SIZE_MSG(Sil_Ast, reqd_ast, 22, 1);\n"
-    //"    if(r.has_t2) SIZE_PRIM(uint32_t, t2, 1);\n"
-    //"    if(r.has_dir) SIZE_MSG(Sil_ADir, dir, 7, 1);\n"
-    //"    SIZE_REP_MSG(Sil_Ast, child, 9, 1);\n"
-    printer->Print("\n"
-    "    // ONLY SAVE ENCAPSULATED LEN\n"
-    "    f->len = sz;\n"
-    "    return f;\n"
-    "}\n\n");
-
-    printer->Print(
-    "int write_msg_$full_name$(SWriter *s, struct _fszmap *f, MY_$full_name$ *a) {\n"
-    "    $full_name$ r;\n"
-    "    struct _fszmap *c;\n"
-    "    // @generated\n", "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        declare_repstack(printer, msg->field(i));
-    }
-    printer->Print("\n"
-    "    init_$full_name$(&r);\n"
-    "    protowr_$full_name$(&r, a); // user's function call\n"
-    "\n"
-    "    // recursively write enclosed objects\n"
-    "    // @generated\n", "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        generate_write_call(printer, msg->field(i));
-    }
-    //"    WRITE_PRIM(enum, type, 1);\n"
-    //"    if(r.has_t2) WRITE_PRIM(sint32_t, t2, 2);\n"
-    //"    if(r.has_name) WRITE_PRIM(string, name, 4);\n"
-    //"    if(r.has_dir) WRITE_MSG(Sil_ADir, dir, 7);\n"
-    //"    WRITE_REP_MSG(Sil_Ast, child, 10);\n"
-    printer->Print("\n"
-    "    return 0;\n"
-    "err:\n"
-    "    DEBUG_MSG(\"Encapsulated message size lookup failed!\\n\");\n"
-    "    return 1;\n"
-    "}\n");
-
-    printer->Print(
-    "MY_$full_name$ *read_$full_name$(const uint8_t *buf, ssize_t sz, void *info) {\n"
-    "    $full_name$ r; // use the stack to store incoming object\n"
-    "    //char strbuf[STRAL_SZ]; // and expanded repeated msg ptrs (TODO)\n"
-    "    //Allocator *l = (Allocator *)strbuf;\n"
-    "    MY_$full_name$ *a;\n"
-    "    unsigned k;\n"
-    "    uint32_t tag;\n"
-    "    uint64_t n;\n"
-    "    int nreqd = 0; // count of required messages read\n"
-    "    // @generated\n",
-                    "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        declare_repstack(printer, msg->field(i));
-    }
-    printer->Print(
-    "\n    //l->sp = (void *)l + sizeof(Allocator);\n"
-    "    //l->avail = STRAL_SZ - sizeof(Allocator);\n"
-    "    //l->next = NULL\n"
-    "    init_$full_name$(&r);\n"
-    "    while(sz > 0) {\n"
-    "        k = read_uint32(&tag, buf, sz);\n"
-    "        buf += k; sz -= k;\n"
-    "        switch(tag >> 3) { // Handle known message read types\n"
-    "        // @generated\n",
-            "full_name", DotsToUnderscores(msg->full_name()));
-    for(int i = 0; i < msg->field_count(); i++) {
-        generate_read_case(printer, msg->field(i));
-    //"        case 1:\n"
-    //"            if((tag & 7) != 0) goto skip; // check wire type for errors\n"
-    //"            READ_PRIM(uint32_t, &r.i);\n"
-    //"            nreqd++;\n"
-        printer->Print(
-        "            continue;\n");
-    }
-    printer->Print(
-    "        }\n"
-    "skip:\n"
-    "        k = skip_len(tag, buf, sz);\n"
-    "        buf += k; sz -= k;\n"
-    "    }\n"
-    "    if(sz != 0 || nreqd < $num_reqd$) {\n"
-    "err:\n"
-    "        DEBUG_MSG(\"Read of $full_name$ failed.\\n\");\n"
-    "        return NULL;\n"
-    "    }\n\n"
-    "    a = protord_$full_name$(info, &r); // user's function call\n"
-    "    //if(l->next != NULL) allocator_dtor(&l->next);\n"
-    "    return a;\n"
-    "}\n", "full_name", DotsToUnderscores(msg->full_name()),
-        "num_reqd", "0"); // TODO
 
     printer->Print("\n");
     printer->Print(kThickSeparator);
     printer->Print("\n");
+
+    generate_api(printer, msg);
 }
 
-// API helper functions (avoid caching sizes directly)
-void FileGenerator::generate_top_api(io::Printer *printer, const Descriptor *msg) {
+void FileGenerator::gen_stub_hdr(io::Printer* printer, const Descriptor *msg) {
+    if(written[msg->full_name()] > 4) {
+        return;
+    }
+    written[msg->full_name()] = 5;
+
+    for(int i = 0; i < msg->field_count(); i++) {
+        const FieldDescriptor* field = msg->field(i);
+        if(field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+            gen_stub_hdr(printer, field->message_type());
+        }
+    }
     printer->Print(
-    "int $full_name$_to_file(int fd, MY_$full_name$ *a) {\n"
-    "    Allocator *l = allocator_ctor();\n"
-    "    struct _fszmap *f;\n"
-    "    SWriter s = { .write = write_to_file, .stream = &fd };\n"
-    "    int ret;\n"
-    "\n"
-    "    f = size_$full_name$(l, a);\n"
-    "    ret = write_msg_$full_name$(&s, f, a);\n"
-    "\n"
-    "    allocator_dtor(&l);\n"
-    "    return ret;\n"
-    "}\n"
-    "uint8_t *$full_name$_to_string(size_t *len, MY_$full_name$ *a) {\n"
-    "    Allocator *l = allocator_ctor();\n"
-    "    uint8_t *buf, *pos;\n"
-    "    struct _fszmap *f;\n"
-    "    SWriter s = { .write = write_to_string, .stream = &pos };\n"
-    "\n"
-    "    f = size_$full_name$(l, a);\n"
-    "    *len = f->len;\n"
-    "    if( (buf = malloc(*len)) == NULL) {\n"
-    "        DEBUG_MSG(\"Memory allocation error.\\n\");\n"
-    "        allocator_dtor(&l);\n"
-    "        return NULL;\n"
-    "    }\n"
-    "    pos = buf;\n"
-    "    if(write_msg_$full_name$(&s, f, a)) {\n"
-    "        free(buf);\n"
-    "        buf = NULL;\n"
-    "    }\n"
-    "\n"
-    "    allocator_dtor(&l);\n"
-    "    return buf;\n"
-    "}\n", "full_name", DotsToUnderscores(msg->full_name()));
+        "#define MY_$full_name$ $full_name$\n",
+        "full_name", DotsToUnderscores(msg->full_name()));
 }
 
+void FileGenerator::gen_stub(io::Printer *printer, const Descriptor *msg) {
+    if(written[msg->full_name()] > 5) {
+        return;
+    }
+    written[msg->full_name()] = 6;
+
+    for(int i = 0; i < msg->field_count(); i++) {
+        const FieldDescriptor* field = msg->field(i);
+        if(field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+            gen_stub(printer, field->message_type());
+        }
+    }
+    printer->Print("\n");
+    printer->Print(kThinSeparator);
+    printer->Print("\n");
+
+    generate_stub(printer, msg);
+}
 
 } // ansi_c
 } // compiler

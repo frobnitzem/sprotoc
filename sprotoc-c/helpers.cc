@@ -286,7 +286,7 @@ void JoinStrings(const vector<string>& components,
   JoinStringsIterator(components.begin(), components.end(), delim, result);
 }
 
-int fixed_size(FieldDescriptor::Type t) {
+int fixed_size(const FieldDescriptor::Type t) {
     switch(t) {
     case FieldDescriptor::TYPE_DOUBLE:
     case FieldDescriptor::TYPE_SFIXED64:
@@ -298,11 +298,26 @@ int fixed_size(FieldDescriptor::Type t) {
         return 4;
     case FieldDescriptor::TYPE_BOOL:
         return 1;
+    default:
+        return 0;
     }
-    return 0;
 }
 
-string CTName(FieldDescriptor::Type t) {
+string CFieldType(const FieldDescriptor *field) {
+    switch(field->cpp_type()) {
+    case FieldDescriptor::CPPTYPE_ENUM:
+            return "enum MY_" + DotsToUnderscores(field->
+                        enum_type()->full_name());
+    case FieldDescriptor::CPPTYPE_MESSAGE:
+            return "MY_" + DotsToUnderscores(field->message_type()->full_name()) + " *";
+    case FieldDescriptor::CPPTYPE_STRING:
+            return "char *";
+    default:
+            return CTName(field->type());
+    }
+}
+
+string CTName(const FieldDescriptor::Type t) {
     switch(t) {
     case FieldDescriptor::TYPE_DOUBLE:
         return "double";
@@ -323,7 +338,7 @@ string CTName(FieldDescriptor::Type t) {
     case FieldDescriptor::TYPE_FIXED32:
         return "uint32_t";
     case FieldDescriptor::TYPE_BOOL:
-        return "bool";
+        return "unsigned";
     case FieldDescriptor::TYPE_STRING:
         return "string";
     case FieldDescriptor::TYPE_BYTES:
@@ -338,7 +353,7 @@ string CTName(FieldDescriptor::Type t) {
     return "#error unknown field type";
 }
 
-string GTName(FieldDescriptor::Type t) {
+string GTName(const FieldDescriptor::Type t) {
     switch(t) {
     case FieldDescriptor::TYPE_DOUBLE:
     case FieldDescriptor::TYPE_SFIXED64:

@@ -53,11 +53,13 @@ static inline unsigned write_fixed64(SWriter *, uint64_t);
 static inline unsigned write_bool(SWriter *, unsigned);
 
 // Primitive reading functions
-static inline unsigned read_fixed32(uint32_t *, const uint8_t *, size_t);
+#define read_fixed32(n, data, sz) read_fuint32((uint32_t *)n, data, sz)
+static inline unsigned read_fuint32(uint32_t *, const uint8_t *, size_t);
 static inline unsigned read_uint32(uint32_t *, const uint8_t *, size_t);
 static inline unsigned read_sint32(int32_t *, const uint8_t *, size_t);
 #define read_int32(n, data, sz) read_uint32((uint32_t *)n, data, sz)
-static inline unsigned read_fixed64(uint64_t *, const uint8_t *, size_t);
+#define read_fixed64(n, data, sz) read_fuint64((uint64_t *)n, data, sz)
+static inline unsigned read_fuint64(uint64_t *, const uint8_t *, size_t);
 static inline unsigned read_uint64(uint64_t *, const uint8_t *, size_t);
 static inline unsigned read_sint64(int64_t *, const uint8_t *, size_t);
 #define read_int64(n, data, sz) read_uint64((uint64_t *)n, data, sz)
@@ -69,19 +71,19 @@ static inline size_t skip_len(uint32_t tag, const uint8_t *, size_t);
 
 // Primitive sizes (defined using varint-encoding sizes)
 /*
-#define protosz_int32(wd, i)  (varsz_uint32((wd) << 3) +  varsz_int32(i))
-#define protosz_uint32(wd, i) (varsz_uint32((wd) << 3) + varsz_uint32(i))
-#define protosz_sint32(wd, i) (varsz_uint32((wd) << 3) + varsz_sint32(i))
-#define protosz_int64(wd, i)  (varsz_uint32((wd) << 3) +  varsz_int32(i))
-#define protosz_uint64(wd, i) (varsz_uint32((wd) << 3) + varsz_uint64(i))
-#define protosz_sint64(wd, i) (varsz_uint32((wd) << 3) + varsz_sint64(i))
+#define protosz_int32(wd, i)  (size_uint32((wd) << 3) +  size_int32(i))
+#define protosz_uint32(wd, i) (size_uint32((wd) << 3) + size_uint32(i))
+#define protosz_sint32(wd, i) (size_uint32((wd) << 3) + size_sint32(i))
+#define protosz_int64(wd, i)  (size_uint32((wd) << 3) +  size_int32(i))
+#define protosz_uint64(wd, i) (size_uint32((wd) << 3) + size_uint64(i))
+#define protosz_sint64(wd, i) (size_uint32((wd) << 3) + size_sint64(i))
 
 #define protosz_enum(wd, i)   protosz_uint32(wd, i)
-#define protosz_float(wd, x)  (varsz_uint32((wd) << 3) + 4)
-#define protosz_double(wd, x) (varsz_uint32((wd) << 3) + 8)
+#define protosz_float(wd, x)  (size_uint32((wd) << 3) + 4)
+#define protosz_double(wd, x) (size_uint32((wd) << 3) + 8)
 static inline size_t protosz_string(uint32_t wd, char *s) {
     uint64_t slen = strlen(s);
-    return varsz_uint32(wd << 3) + varsz_uint64(slen) + slen;
+    return size_uint32(wd << 3) + size_uint64(slen) + slen;
 }*/
 #define size_fixed32(a) (4)
 #define size_fixed64(a) (8)
@@ -102,7 +104,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
                                         write_sint64(s, i); }
 
 #define write_msg_bool(s, wd, i)     { write_uint32(s, (wd) << 3 | 5); \
-                                        write_bool(s, x); }
+                                        write_bool(s, i); }
 #define write_msg_fixed32(s, wd, x)  { write_uint32(s, (wd) << 3 | 5); \
                                         write_fixed32(s, x); }
 #define write_msg_fixed64(s, wd, x) { write_uint32(s, (wd) << 3 | 1); \
@@ -125,13 +127,13 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         int i; \
         size_t psz = 0; \
         for(i=0; i<r.n_ ## name; i++) { \
-            psz += varsz_ ## type(r.name[i]); \
+            psz += size_ ## type(r.name[i]); \
         } \
-        sz += wsz + varsz_uint64(psz) + psz; \
+        sz += wsz + size_uint64(psz) + psz; \
     }
 #define SIZE_STRING(name, wsz) \
     sz += wsz + size_uint64(r.len_ ## name) + r.len_ ## name;
-#define SIZE_REP_STRING(name, wd) \
+#define SIZE_REP_STRING(name, wsz) \
     if(r.name != NULL && r.len_ ## name != NULL) { \
         int i; \
         sz += (wsz) * r.n_ ## name; \
@@ -160,26 +162,26 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
     }
 
 // Write primitives.
-#define WRITE_PRIM(type, name, wd) \
-    write_msg_ ## type(s, wd, r.name);
-#define WRITE_REP_PRIM(type, name, wd) \
+#define WRITE_PRIM(type, cast, name, wd) \
+    write_msg_ ## type(s, wd, cast r.name);
+#define WRITE_REP_PRIM(type, cast, name, wd) \
     if(r.name != NULL) { \
         int i; \
         for(i=0; i<r.n_ ## name; i++) { \
-            write_msg_ ## type(s, wd, r.name[i]); \
+            write_msg_ ## type(s, wd, cast r.name[i]); \
         } \
     }
-#define WRITE_REP_PACKED(type, name, wd) \
+#define WRITE_REP_PACKED(type, cast, name, wd) \
     if(r.name != NULL) { \
         int i; \
         size_t psz = 0; \
         for(i=0; i<r.n_ ## name; i++) { \
-            psz += varsz_ ## type(r.name[i]); \
+            psz += size_ ## type(r.name[i]); \
         } \
         write_uint32(s, wd << 3 | 2); \
         write_uint64(psz); \
         for(i=0; i<r.n_ ## name; i++) { \
-            write_ ## type(s, r.name[i]); \
+            write_ ## type(s, cast r.name[i]); \
         } \
     }
 #define WRITE_STRING(name, wd) { \
@@ -196,15 +198,13 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             s->write(s->stream, r.name[i], r.len_ ## name[i]); \
         } \
     }
-// Note: write_msg_$message$ differs from the rest of the internal API
-//       in that they don't write their own leading tags.
 #define WRITE_MSG(type, name, wd) { \
         { uint32_t i = wd; \
         c = lookup_node(f->sub, &i, &fszops); }; \
         if(c == fszops.nil) goto err; \
         write_uint32(s, wd << 3 | 2); \
         write_uint64(s, c->len); \
-        if(write_msg_ ## type(s, c, r.name)) return 1; \
+        if(write_ ## type(s, c, r.name)) return 1; \
     }
 // writes repeated messages in reversed order
 #define WRITE_REP_MSG(type, name, wd) \
@@ -215,7 +215,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             if(c == fszops.nil) goto err; \
             write_uint32(s, wd << 3 | 2); \
             write_uint64(s, c->len); \
-            if(write_msg_ ## type(s, c, r.name[i-1])) return 1; \
+            if(write_ ## type(s, c, r.name[i-1])) return 1; \
             c = c->next; \
         } \
     }

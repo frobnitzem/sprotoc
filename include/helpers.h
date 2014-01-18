@@ -26,7 +26,8 @@ namespace protobuf {
     void JoinStrings(const vector<string>& components,
                      const char* delim,
                      string * result);
-    int fixed_size(FieldDescriptor::Type t);
-    string CTName(FieldDescriptor::Type t);
-    string GTName(FieldDescriptor::Type t);
+    int fixed_size(const FieldDescriptor::Type t);
+    string CFieldType(const FieldDescriptor *field);
+    string CTName(const FieldDescriptor::Type t);
+    string GTName(const FieldDescriptor::Type t);
 }}

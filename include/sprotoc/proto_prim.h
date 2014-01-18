@@ -182,7 +182,7 @@ static inline unsigned write_bool(SWriter *s, unsigned value) {
 }
 
 // varint-read primitives
-static inline unsigned read_fixed32(uint32_t *n, const uint8_t *data, size_t sz) {
+static inline unsigned read_fuint32(uint32_t *n, const uint8_t *data, size_t sz) {
   if(sz < 4) return sz > 0 ? sz : 0;
 #if !defined(WORDS_BIGENDIAN)
   uint32_t t;
@@ -230,16 +230,19 @@ static inline unsigned read_sint32(int32_t *n, const uint8_t *data, size_t sz) {
         *n = v>>1;
     return k;
 }
-static inline unsigned read_fixed64(uint64_t *n, const uint8_t *data, size_t sz) {
+static inline unsigned read_fuint64(uint64_t *n, const uint8_t *data, size_t sz) {
   if(sz < 8) return sz > 0 ? sz : 0;
 #if !defined(WORDS_BIGENDIAN)
-  uint64_t t;
   memcpy(&n, data, 8);
-#else
-  *n = (uint64_t)read_fixed_uint32 (data)
-      | (((uint64_t)read_fixed_uint32(data+4)) << 32);
-#endif
   return 8;
+#else
+  {   uint32_t t, u;
+      read_fuint32(&t, data, sz);
+      read_fuint32(&u, data+4, sz-4);
+      *n = (uint64_t)t | (uint64_t)u << 32;
+  }
+  return 8;
+#endif
 }
 static inline unsigned read_uint64(uint64_t *n, const uint8_t *data, size_t sz) {
   unsigned shift, i;
