@@ -271,7 +271,7 @@ static inline unsigned read_bool(unsigned *n, const uint8_t *data, size_t sz) {
   unsigned i;
   *n = data[0] > 0;
   sz = sz > 10 ? 10 : sz;
-  for(i=0; i < sz && data[i] >= 128; i++);
+  for(i=1; i < sz && data[i-1] >= 128; i++);
   return i;
 }
 

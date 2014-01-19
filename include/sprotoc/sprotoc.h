@@ -6,8 +6,8 @@ typedef struct {
     void (*write)(void *stream, const void *buf, size_t len);
     void *stream;
 } SWriter;
-void write_to_string(void *posin, const void *buf, size_t len);
-void write_to_file(void *fin, const void *buf, size_t len);
+void _swrite_to_string(void *posin, const void *buf, size_t len);
+void _swrite_to_file(void *fin, const void *buf, size_t len);
 
 // For caching recursive object sizes
 struct _fszmap;
@@ -103,7 +103,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
 #define write_msg_sint64(s, wd, i) { write_uint32(s, (wd) << 3); \
                                         write_sint64(s, i); }
 
-#define write_msg_bool(s, wd, i)     { write_uint32(s, (wd) << 3 | 5); \
+#define write_msg_bool(s, wd, i)     { write_uint32(s, (wd) << 3); \
                                         write_bool(s, i); }
 #define write_msg_fixed32(s, wd, x)  { write_uint32(s, (wd) << 3 | 5); \
                                         write_fixed32(s, x); }
@@ -138,7 +138,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         int i; \
         sz += (wsz) * r.n_ ## name; \
         for(i=0; i<r.n_ ## name; i++) { \
-            sz += size_uint64(s, r.len_ ## name[i]) + r.len_ ## name[i]; \
+            sz += size_uint64(r.len_ ## name[i]) + r.len_ ## name[i]; \
         } \
     }
 #define SIZE_MSG(type, name, wd, wsz) { \
@@ -179,7 +179,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             psz += size_ ## type(r.name[i]); \
         } \
         write_uint32(s, wd << 3 | 2); \
-        write_uint64(psz); \
+        write_uint64(s, psz); \
         for(i=0; i<r.n_ ## name; i++) { \
             write_ ## type(s, cast r.name[i]); \
         } \
@@ -206,16 +206,24 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         write_uint64(s, c->len); \
         if(write_ ## type(s, c, r.name)) return 1; \
     }
-// writes repeated messages in reversed order
+// Writes repeated messages by reversing the size list in-place first.
 #define WRITE_REP_MSG(type, name, wd) \
     if(r.name) { \
         uint32_t i = wd; \
+        type *next, *ptr = NULL; \
         c = lookup_node(f->sub, &i, &fszops); \
-        for(i=r.n_ ## name; i > 0; i--) { \
+        for(i=0; i < r.n_ ## name; i++) { \
+            next = c->next; \
+            c->next = ptr; \
+            ptr = c; \
+            c = next; \
+        } \
+        c = ptr; \
+        for(i=0; i < r.n_ ## name; i++) { \
             if(c == fszops.nil) goto err; \
             write_uint32(s, wd << 3 | 2); \
             write_uint64(s, c->len); \
-            if(write_ ## type(s, c, r.name[i-1])) return 1; \
+            if(write_ ## type(s, c, r.name[i])) return 1; \
             c = c->next; \
         } \
     }

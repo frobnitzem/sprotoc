@@ -228,9 +228,11 @@ void generate_size_call(io::Printer *printer, const FieldDescriptor* field) {
   printer->Print("    ");
   if(field->is_repeated()) {
       if(field->is_packable() && field->options().packed()) {
-          printer->Print("SIZE_REP_PACKED($type$, $name$);\n",
+          snprintf(line, sizeof(line), "%d", varint_sz(field->number() << 3));
+          printer->Print("SIZE_REP_PACKED($type$, $name$, $wsz$);\n",
                         "type", GTName(field->type()),
-                        "name", field->name());
+                        "name", field->name(),
+                        "wsz", line);
           return;
       } else {
           r_type = "SIZE_REP";

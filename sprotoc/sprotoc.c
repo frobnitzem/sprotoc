@@ -10,7 +10,7 @@
 int $full_name$_to_file(FILE *file, MY_$full_name$ *a) {
     Allocator *l = allocator_ctor();
     struct _fszmap *f;
-    SWriter s = { .f = write_to_file, .ptr = file };
+    SWriter s = { .f = _swrite_to_file, .ptr = file };
     int ret;
 
     f = protosz_$full_name$(l, MY_$full_name$ *a);
@@ -24,7 +24,7 @@ char *$full_name$_to_string(size_t *len, MY_$full_name$ *a) {
     Allocator *l = allocator_ctor();
     char *buf;
     struct _fszmap *f;
-    SWriter s = { .f = write_to_string };
+    SWriter s = { .f = _swrite_to_string };
 
     f = protosz_$full_name$(l, MY_$full_name$ *a);
     *len = f->len;
@@ -44,7 +44,7 @@ char *$full_name$_to_string(size_t *len, MY_$full_name$ *a) {
 }*/
 
 // helper functions (readers, writers, allocator)
-void write_to_file(void *fin, const void *buf, size_t len) {
+void _swrite_to_file(void *fin, const void *buf, size_t len) {
     int fd = *(int *)fin;
     ssize_t ret;
     do {
@@ -56,7 +56,7 @@ void write_to_file(void *fin, const void *buf, size_t len) {
 }
 
 /*
-void swrite_to_string(void *lstin, const char *buf, size_t len) {
+void _swrite_to_string(void *lstin, const char *buf, size_t len) {
     struct string_info *s = lstin;
     size_t r;
     char *nsp;
@@ -81,7 +81,7 @@ void swrite_to_string(void *lstin, const char *buf, size_t len) {
 // Silently overflows buffers and writes on subway walls (and tenement halls).
 // Use only when you're sure of the length of all writes beforehand
 // (like when you've accurately counted them)
-void write_to_string(void *posin, const void *buf, size_t len) {
+void _swrite_to_string(void *posin, const void *buf, size_t len) {
     void **pos = posin;
     /*int i;
     for(i=0; i<len; i++)
