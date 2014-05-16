@@ -244,7 +244,7 @@ void FileGenerator::GenerateStubSource(io::Printer* printer, string basename) {
     "        fprintf(stderr, \"Error writing test data.\\n\");\n"
     "        return 1;\n"
     "    }\n"
-    "    ret = read_$full_name$(buf, len, l);\n"
+    "    ret = read_$full_name$(&buf, &len, l);\n"
     "    free(buf);\n"
     "    if(ret == NULL) {\n"
     "        return 1;\n"

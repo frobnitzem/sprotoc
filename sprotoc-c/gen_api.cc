@@ -66,7 +66,7 @@ void declare_api(io::Printer *printer, const Descriptor *msg) {
       "                         MY_$full_name$ *a); // user \n"
       "MY_$full_name$ *protord_$full_name$(void *info,\n"
       "                         $full_name$ *r); // user \n"
-      "MY_$full_name$ *read_$full_name$(const uint8_t *buf,\n"
+      "MY_$full_name$ *read_$full_name$(const uint8_t **buf,\n"
       "                         ssize_t sz, void *info);\n\n"
       //"static inline void init_$full_name$($full_name$ *r);\n"
       "struct _fszmap *size_$full_name$(Allocator *l,\n"
@@ -173,7 +173,7 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     "}\n");
 
     printer->Print(
-    "MY_$full_name$ *read_$full_name$(const uint8_t *buf, ssize_t sz, void *info) {\n"
+    "MY_$full_name$ *read_$full_name$(const uint8_t **buf, ssize_t sz, void *info) {\n"
     "    $full_name$ r; // use the stack to store incoming object\n"
     "    //char strbuf[STRAL_SZ]; // and expanded repeated msg ptrs (TODO)\n"
     "    //Allocator *l = (Allocator *)strbuf;\n"
@@ -196,8 +196,8 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     "    //l->next = NULL\n"
     "    init_$full_name$(&r);\n"
     "    while(sz > 0) {\n"
-    "        k = read_uint32(&tag, buf, sz);\n"
-    "        buf += k; sz -= k;\n"
+    "        k = read_uint32(&tag, *buf, sz);\n"
+    "        *buf += k; sz -= k;\n"
     "        switch(tag >> 3) { // Handle known message read types\n"
     "        // @generated\n",
             "full_name", DotsToUnderscores(msg->full_name()));
@@ -213,8 +213,8 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     printer->Print(
     "        }\n"
     "skip:\n"
-    "        k = skip_len(tag, buf, sz);\n"
-    "        buf += k; sz -= k;\n"
+    "        k = skip_len(tag, *buf, sz);\n"
+    "        *buf += k; sz -= k;\n"
     "    }\n"
     "    if(sz != 0) {\n"
     "err:\n"

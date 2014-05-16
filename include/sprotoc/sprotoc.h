@@ -210,7 +210,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
 #define WRITE_REP_MSG(type, name, wd) \
     if(r.name) { \
         uint32_t i = wd; \
-        type *next, *ptr = NULL; \
+        void *next, *ptr = NULL; \
         c = lookup_node(f->sub, &i, &fszops); \
         for(i=0; i < r.n_ ## name; i++) { \
             next = c->next; \
@@ -231,21 +231,21 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
 
 // Read primitives.
 #define READ_PRIM(type, name) { \
-        k = read_ ## type(&r.name, buf, sz); \
-        buf += k; sz -= k; \
+        k = read_ ## type(&r.name, *buf, sz); \
+        *buf += k; sz -= k; \
     }
 #define READ_REP_PRIM(type, name) \
     if(r.n_ ## name < MAX_REPEATED) { \
-        k = read_ ## type(&r.name[r.n_ ## name], buf, sz); \
-        buf += k; sz -= k; \
+        k = read_ ## type(&r.name[r.n_ ## name], *buf, sz); \
+        *buf += k; sz -= k; \
         r.n_ ## name ++; \
     } else { \
         DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
         goto skip; \
     }
 #define READ_REP_PACKED(type, name) { \
-        k = read_uint64(&n, buf, sz); \
-        buf += k; sz -= k; \
+        k = read_uint64(&n, *buf, sz); \
+        *buf += k; sz -= k; \
         n = sz - n; \
         if(n < 0) sz = n = 0; \
         while(sz > n) { \
@@ -253,40 +253,40 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         } \
     }
 #define READ_STRING(name) { \
-    k = read_uint64(&n, buf, sz); \
-    buf += k; sz -= k; \
-    r.name = (char *)buf; \
+    k = read_uint64(&n, *buf, sz); \
+    *buf += k; sz -= k; \
+    r.name = (char *)*buf; \
     r.len_ ## name = n > sz ? sz : n; \
-    buf += n; sz -= n; \
+    *buf += n; sz -= n; \
     }
 #define READ_REP_STRING(name) \
     if(r.n_ ## name < MAX_REPEATED) { \
-        k = read_uint64(&n, buf, sz); \
-        buf += k; sz -= k; \
-        r.name[r.n_ ## name] = (char *)buf; \
+        k = read_uint64(&n, *buf, sz); \
+        *buf += k; sz -= k; \
+        r.name[r.n_ ## name] = (char *)*buf; \
         r.len_ ## name[r.n_ ## name] = n > sz ? sz : n; \
-        buf += n; sz -= n; \
+        *buf += n; sz -= n; \
         r.n_ ## name ++; \
     } else { \
         DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
         goto skip; \
     }
 #define READ_MSG(type, name) { \
-        k = read_uint64(&n, buf, sz); \
-        buf += k; sz -= k; \
+        k = read_uint64(&n, *buf, sz); \
+        *buf += k; sz -= k; \
         if(n <= sz) \
             r.name = read_ ## type(buf, n, info); \
-        buf += n; sz -= n; \
+        sz -= n; \
     }
 #define READ_REP_MSG(type, name) \
     if(r.n_ ## name < MAX_REPEATED) { \
-        k = read_uint64(&n, buf, sz); \
-        buf += k; sz -= k; \
+        k = read_uint64(&n, *buf, sz); \
+        *buf += k; sz -= k; \
         if(n <= sz && (r.name[r.n_ ## name] = read_ ## type(buf, n, info)) \
                     != NULL) { \
             r.n_ ## name ++; \
         } \
-        buf += n; sz -= n; \
+        sz -= n; \
     } else { \
         DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
         goto skip; \

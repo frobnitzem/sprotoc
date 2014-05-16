@@ -368,7 +368,7 @@ string GTName(const FieldDescriptor::Type t) {
     case FieldDescriptor::TYPE_SINT64:
         return "sint64";
     case FieldDescriptor::TYPE_UINT64:
-        return "uint64_t";
+        return "uint64";
     case FieldDescriptor::TYPE_INT32:
         return "int32";
     case FieldDescriptor::TYPE_SINT32:

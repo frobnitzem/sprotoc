@@ -231,9 +231,12 @@ static inline unsigned read_sint32(int32_t *n, const uint8_t *data, size_t sz) {
     return k;
 }
 static inline unsigned read_fuint64(uint64_t *n, const uint8_t *data, size_t sz) {
-  if(sz < 8) return sz > 0 ? sz : 0;
+  if(sz < 8) {
+      *n = 0;
+      return sz > 0 ? sz : 0;
+  }
 #if !defined(WORDS_BIGENDIAN)
-  memcpy(&n, data, 8);
+  memcpy(n, data, 8);
   return 8;
 #else
   {   uint32_t t, u;

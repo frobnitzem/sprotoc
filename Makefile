@@ -2,8 +2,8 @@ CC = cc
 CXX = c++
 LD = c++
 CFLAGS = -I$(PWD)/include
-CXXFLAGS = -I$(PWD)/include $(shell pkg-config --cflags protobuf)
-LDFLAGS = -L$(PWD)/lib $(shell pkg-config --libs protobuf) -lprotoc
+CXXFLAGS = -I$(PWD)/include $(shell pkg-config --cflags protobuf) -stdlib=libstdc++
+LDFLAGS = -L$(PWD)/lib $(shell pkg-config --libs protobuf) -lprotoc -stdlib=libstdc++
 
 LIBS = $(PWD)/lib/sprotoc-c.a $(PWD)/lib/sprotoc.a
 PWD = $(shell pwd)
