@@ -47,22 +47,18 @@
 #include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/stubs/common.h>
-
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
   class FileDescriptor;        // descriptor.h
-  namespace io {
+  /*namespace io {
     class Printer;             // printer.h
-  }
+  }*/
 
 namespace compiler {
 namespace ansi_c {
 
-// CodeGenerator implementation which generates a C++ source file and
-// header.  If you create your own protocol compiler binary and you want
-// it to support C++ output, you can do so by registering an instance of this
-// CodeGenerator with the CommandLineInterface in your main() function.
 class LIBPROTOC_EXPORT CGenerator : public CodeGenerator {
  public:
   CGenerator();

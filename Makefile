@@ -1,18 +1,19 @@
-CC = cc
-CXX = c++
-LD = c++
+CC = gcc
+CXX = g++
+LD = g++
 CFLAGS = -I$(PWD)/include
-CXXFLAGS = -I$(PWD)/include $(shell pkg-config --cflags protobuf) -stdlib=libstdc++
-LDFLAGS = -L$(PWD)/lib $(shell pkg-config --libs protobuf) -lprotoc -stdlib=libstdc++
+CXXFLAGS = -I$(PWD)/include $(shell pkg-config --cflags protobuf) #-stdlib=libstdc++
+LDFLAGS = -L$(PWD)/lib $(shell pkg-config --libs protobuf) -lprotoc #-stdlib=libstdc++
 
-LIBS = $(PWD)/lib/sprotoc-c.a $(PWD)/lib/sprotoc.a
+LIBS = $(PWD)/lib/sprotoc-c.a
+#$(PWD)/lib/sprotoc.a
 PWD = $(shell pwd)
 
 # output executable can be any name, but must have
 # relative path (so it lives in $(PWD)/$(SPROTOC)
 SPROTOC = bin/sprotoc
 
-export CC LD CFLAGS CXXFLAGS LDFLAGS LIBS SPROTOC
+export CC CXX LD CFLAGS CXXFLAGS LDFLAGS LIBS SPROTOC
 
 all: $(SPROTOC)
 
@@ -28,7 +29,7 @@ clean:
 	make -C sprotoc-c clean
 
 $(SPROTOC): $(LIBS)
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) -o $@ $^ $(LDFLAGS)
 
 test/test.sh:	test $(LIBS) $(SPROTOC)
 	make -C test gens

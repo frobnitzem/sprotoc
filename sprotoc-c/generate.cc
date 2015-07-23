@@ -1,4 +1,4 @@
-#include <google/protobuf/compiler/cpp/cpp_generator.h>
+#include <google/protobuf/compiler/code_generator.h>
 
 #include <vector>
 #include <utility>

@@ -21,6 +21,8 @@
  *    along with rbtree.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _RBTREE_INC
+#define _RBTREE_INC
 /* The cmp function operates between nodes (void *N)-s.
  * These must store L, R (void *)-s at N + coff.
  * The black (0) / red (1) bit is used at
@@ -40,3 +42,4 @@ void *lookup_node(void *N, const void *A, const rbop_t *o);
 
 // returns mask or 0
 unsigned char get_mask(const void *N, const rbop_t *o);
+#endif

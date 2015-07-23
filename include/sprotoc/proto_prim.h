@@ -1,3 +1,5 @@
+#include <string.h>
+
 // varint-size primitives
 static inline unsigned size_uint32(uint32_t v) {
   if (v < (1<<7)) return 1;
@@ -196,27 +198,27 @@ static inline unsigned read_fuint32(uint32_t *n, const uint8_t *data, size_t sz)
 static inline unsigned read_uint32(uint32_t *n, const uint8_t *data, size_t sz) {
   *n = data[0] & 0x7f;
   if(sz >= 5) { // don't worry about len
-      if(data[0] < 0x7f)
+      if(data[0] < 0x80)
           return 1;
       *n |= ((uint32_t)(data[1] & 0x7f) << 7);
-      if(data[1] < 0x7f)
+      if(data[1] < 0x80)
           return 2;
       *n |= ((uint32_t)(data[2] & 0x7f) << 14);
-      if(data[2] < 0x7f)
+      if(data[2] < 0x80)
           return 3;
       *n |= ((uint32_t)(data[3] & 0x7f) << 21);
-      if(data[3] < 0x7f)
+      if(data[3] < 0x80)
           return 4;
       *n |= ((uint32_t)(data[4] & 0x7f) << 28);
       return 5;
   }
-  if(data[0] < 0x7f || sz < 2)
+  if(data[0] < 0x80 || sz < 2)
           return 1;
   *n |= ((uint32_t)(data[1] & 0x7f) << 7);
-  if(data[1] < 0x7f || sz < 3)
+  if(data[1] < 0x80 || sz < 3)
           return 2;
   *n |= ((uint32_t)(data[2] & 0x7f) << 14);
-  if(data[2] < 0x7f || sz < 4)
+  if(data[2] < 0x80 || sz < 4)
           return 3;
   *n |= ((uint32_t)(data[3] & 0x7f) << 21);
   return 4;

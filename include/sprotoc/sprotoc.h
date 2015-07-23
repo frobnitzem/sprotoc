@@ -1,3 +1,6 @@
+#ifndef _SPROTOC_INC
+#define _SPROTOC_INC
+
 #include <stdint.h>
 #include "rbtree.h"
 
@@ -132,7 +135,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         sz += wsz + size_uint64(psz) + psz; \
     }
 #define SIZE_STRING(name, wsz) \
-    sz += wsz + size_uint64(r.len_ ## name) + r.len_ ## name;
+    sz += (wsz) + size_uint64(r.len_ ## name) + r.len_ ## name;
 #define SIZE_REP_STRING(name, wsz) \
     if(r.name != NULL && r.len_ ## name != NULL) { \
         int i; \
@@ -141,6 +144,18 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             sz += size_uint64(r.len_ ## name[i]) + r.len_ ## name[i]; \
         } \
     }
+#define SIZE_BYTES(name, wsz) { \
+            uint64_t i = r.name ## _size(r.name ## _data); \
+            sz += (wsz) + size_uint64(i) + i; }
+#define SIZE_REP_BYTES(name, wsz) { \
+    if(r.name != NULL && r.name ## _size != NULL && r.name ## _data != NULL) { \
+        int i; \
+        sz += (wsz) * r.n_ ## name; \
+        for(i=0; i<r.n_ ## name; i++) { \
+            uint64_t j = r.name ## _size(r.name ## _data[i]); \
+            sz += size_uint64(i) + j; \
+        } \
+    } }
 #define SIZE_MSG(type, name, wd, wsz) { \
         c = size_ ## type(l, r.name); \
         c->field = wd; \
@@ -198,6 +213,21 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             s->write(s->stream, r.name[i], r.len_ ## name[i]); \
         } \
     }
+#define WRITE_BYTES(name, wd) { \
+        write_uint32(s, (wd) << 3 | 2); \
+        write_uint64(s, r.name ## _size(r.name ## _data) ); \
+        r.name(s, r.name ## _data); \
+    }
+#define WRITE_REP_BYTES(name, wd) { \
+    if(r.name != NULL && r.name ## _size != NULL && r.name ## _data != NULL) { \
+        int i; \
+        for(i=0; i<r.n_ ## name; i++) { \
+            write_uint32(s, (wd) << 3 | 2); \
+            write_uint64(s, r.name ## _size(r.name ## _data[i]) ); \
+            r.name(s, r.name ## _data[i]); \
+        } \
+    }
+
 #define WRITE_MSG(type, name, wd) { \
         { uint32_t i = wd; \
         c = lookup_node(f->sub, &i, &fszops); }; \
@@ -292,3 +322,4 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         goto skip; \
     }
 
+#endif

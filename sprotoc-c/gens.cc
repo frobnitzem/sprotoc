@@ -64,9 +64,15 @@ void generate_write_call(io::Printer *printer, const FieldDescriptor* field) {
         }
         break;
   case FieldDescriptor::CPPTYPE_STRING:
-        snprintf(line, sizeof(line), "%s_STRING(%s, %d);\n",
+        if(field->type() == FieldDescriptor::TYPE_BYTES) {
+          snprintf(line, sizeof(line), "%s_BYTES(%s, %d);\n",
                     r_type.c_str(),
                     field->name().c_str(), field->number());
+        } else {
+          snprintf(line, sizeof(line), "%s_STRING(%s, %d);\n",
+                    r_type.c_str(),
+                    field->name().c_str(), field->number());
+        }
         break;
   default: // primitive field
         snprintf(line, sizeof(line), "%s_PRIM(%s, %s, %s, %d);\n",
@@ -117,10 +123,15 @@ void generate_init_call(io::Printer *printer, const FieldDescriptor* field) {
       snprintf(def, sizeof(def), "%lld", field->default_value_int64());
       break;
   case FieldDescriptor::CPPTYPE_STRING:
-      snprintf(def, sizeof(def), "%lu", field->default_value_string().length());
-      printer->Print("    r->$name$ = def_$name$;\n"
-                     "    r->len_$name$ = $num$;\n",
-                             "name", field->name(), "num", def);
+      if(field->type() == FieldDescriptor::TYPE_BYTES) {
+       printer->Print("    r->$name$_data = NULL;\n"
+                      "    r->$name$ = NULL;\n", "name", field->name());
+      } else {
+       snprintf(def, sizeof(def), "%lu", field->default_value_string().length());
+       printer->Print("    r->$name$ = def_$name$;\n"
+                      "    r->len_$name$ = $num$;\n",
+                              "name", field->name(), "num", def);
+      }
       return;
   case FieldDescriptor::CPPTYPE_ENUM:
       printer->Print("    r->$name$ = $def$;\n", "name", field->name(), "def",
@@ -256,10 +267,17 @@ void generate_size_call(io::Printer *printer, const FieldDescriptor* field) {
         break;
   case FieldDescriptor::CPPTYPE_STRING:
         snprintf(line, sizeof(line), "%d",  varint_sz(field->number() << 3));
-        printer->Print("$rt$_STRING($name$, $sz$);\n",
-                      "rt", r_type,
-                      "name", field->name(),
-                      "sz", line);
+        if(field->type() == FieldDescriptor::TYPE_BYTES) {
+          printer->Print("$rt$_BYTES($name$, $sz$);\n",
+                        "rt", r_type,
+                        "name", field->name(),
+                        "sz", line);
+        } else {
+          printer->Print("$rt$_STRING($name$, $sz$);\n",
+                        "rt", r_type,
+                        "name", field->name(),
+                        "sz", line);
+        }
         break;
   //case FieldDescriptor::CPPTYPE_ENUM: // not validated.
   default: // primitive field
@@ -288,17 +306,43 @@ void generate_copy_in(io::Printer *printer, const FieldDescriptor* field) {
   if(field->is_repeated()) { // handle repeated messages here
       printer->Print("    if(a->$name$ != NULL) {\n"
                      "      out->n_$name$ = a->n_$name$;\n"
-                     "      out->$name$ = a->$name$;\n"
               , "name", field->name());
       if(field->type() == FieldDescriptor::TYPE_STRING) {
-          printer->Print("      out->len_$name$ = a->len_$name$; // must have space for storing lengths\n"
+          printer->Print("      out->$name$ = a->$name$;\n"
+                         "      out->len_$name$ = a->len_$name$; // must have space for storing lengths\n"
                          "      for(i=0; i<a->n_$name$; i++)\n"
                          "        out->len_$name$[i] = strlen(a->$name$[i]);\n"
               , "name", field->name());
+      } else if(field->type() == FieldDescriptor::TYPE_BYTES) {
+          printer->Print("      out->$name$ = (size_t (*)(SWriter *, void *))write_$name$;\n"
+                         "      out->$name$_size = (size_t (*)(void *))size_$name$\n"
+                         "      for(i=0; i<a->n_$name$; i++)\n"
+                         "        out->$name$_data[i] = a->$name$[i];\n"
+              , "name", field->name());
+      } else {
+          printer->Print("      out->$name$ = a->$name$;\n"
+              , "name", field->name());
       }
-      printer->Print("    } else {\n"
+      printer->Print(
+                     "    } else {\n"
                      "      out->n_$name$ = 0;\n"
                      "    }\n", "name", field->name());
+      return;
+  }
+  if(field->type() == FieldDescriptor::TYPE_BYTES) {
+      if(field->is_optional()) {
+        printer->Print("    out->has_$name$ = a->has_$name$;\n"
+                       "    if(a->has_$name$) {\n"
+                       , "name", field->name());
+      } else {
+        printer->Print("    if(a->$name$ != NULL) {\n"
+                       , "name", field->name());
+      }
+      printer->Print("      out->$name$ = (size_t (*)(SWriter *, void *))write_$name$;\n"
+                     "      out->$name$_size = (size_t (*)(void *))size_$name$\n"
+                     "      out->$name$_data = a->$name$;\n"
+                     "    }\n"
+              , "name", field->name());
       return;
   }
   if(field->is_optional()) { // handle specially tested messages
@@ -307,7 +351,7 @@ void generate_copy_in(io::Printer *printer, const FieldDescriptor* field) {
               , "name", field->name());
       printer->Indent(); printer->Indent();
       opt = 1;
-  } else if(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
+  } else if(field->type() == FieldDescriptor::TYPE_STRING) {
       printer->Print("    if(a->$name$ != NULL) {\n"
               , "name", field->name());
       printer->Indent(); printer->Indent();
@@ -321,10 +365,11 @@ void generate_copy_in(io::Printer *printer, const FieldDescriptor* field) {
   printer->Print("    out->$name$ = a->$name$;\n", "name", field->name());
 
   if(opt) {
-      if(opt == 2)
+      if(opt == 2) {
           printer->Print("} else {\n"
                          "    out->len_$name$ = 0;\n",
                             "name", field->name());
+      }
       printer->Outdent(); printer->Outdent();
       printer->Print("    }\n");
   }
@@ -344,15 +389,28 @@ void generate_struct_len(io::Printer *printer, const FieldDescriptor* field) {
                          "    for(i=0; i<r->n_$name$; i++)\n"
                          "        len += r->len_$name$[i]+1;\n"
               , "name", field->name());
+      } else if(field->type() == FieldDescriptor::TYPE_STRING) {
+          printer->Print("    // bytes aren't null-terminated, save sizes!\n"
+                         "    //len += r->n_$name$*sizeof(int);\n"
+                         "    for(i=0; i<r->n_$name$; i++)\n"
+                         "        len += size_$name$($name$_data[i]);\n"
+              , "name", field->name());
       }
       return;
   }
-  if(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
+  if(field->type() == FieldDescriptor::TYPE_STRING) {
       printer->Print("    ");
       if(field->is_optional()) { // handle specially tested messages
           printer->Print("if(r->has_$name$) ", "name", field->name());
       }
       printer->Print("len += r->len_$name$+1;\n", "name", field->name());
+  } else if(field->type() == FieldDescriptor::TYPE_BYTES) {
+      printer->Print("    ");
+      if(field->is_optional()) { // handle specially tested messages
+          printer->Print("if(r->has_$name$) ", "name", field->name());
+      }
+      printer->Print("len += size_$name$(r->$name$_data);\n"
+                  , "name", field->name());
   }
 }
 
@@ -373,17 +431,29 @@ void generate_copy_out(io::Printer *printer, const FieldDescriptor* field) {
       printer->Print(
          "    out->n_$name$ = r->n_$name$;\n"
          "    out->$name$ = (void *)out + len; len += r->n_$name$*sizeof($type$);\n"
-         "    memcpy(out->$name$, r->$name$, r->n_$name$*sizeof($type$));\n"
              , "type", CFieldType(field), "name", field->name());
       if(field->type() == FieldDescriptor::TYPE_STRING) {
           printer->Print(
-         "    //out->len_$name$ = (void *)out + len; len += r->n_$name$*sizeof(int);\n"
-         "    //memcpy(out->len_$name$, r->len_$name$, r->n_$name$*sizeof(int));\n"
          "    for(i=0; i<r->n_$name$; i++) {\n"
          "        out->$name$[i] = (void *)out + len; len += r->len_$name$[i]+1;\n"
          "        memcpy(out->$name$[i], r->$name$[i], r->len_$name$[i]);\n"
          "        out->$name$[i][r->len_$name$[i]] = 0;\n"
          "    }\n"
+             , "name", field->name());
+      }
+      if(field->type() == FieldDescriptor::TYPE_BYTES) {
+          printer->Print(
+         "    out->len_$name$ = (void *)out + len; len += r->n_$name$*sizeof(size_t);\n"
+         "    for(i=0; i<r->n_$name$; i++) {\n"
+         "        size_t sz = $name$_size(out->$name$_data[i]);\n"
+         "        out->$name$[i] = (void *)out + len; len += sz;\n"
+         "        out->len_$name$[i] = sz;\n"
+         "        memcpy(out->$name$[i], r->$name$_data[i], sz);\n"
+         "    }\n"
+             , "name", field->name());
+      } else {
+          printer->Print(
+         "    memcpy(out->$name$, r->$name$, r->n_$name$*sizeof($type$));\n"
              , "type", CFieldType(field), "name", field->name());
       }
       return;
@@ -397,10 +467,14 @@ void generate_copy_out(io::Printer *printer, const FieldDescriptor* field) {
   }
 
   if(field->type() == FieldDescriptor::TYPE_STRING) {
-      printer->Print("    //out->len_$name$ = r->len_$name$; // use null-term\n"
-                     "    out->$name$ = (void *)out + len; len += r->len_$name$+1;\n"
+      printer->Print("    out->$name$ = (void *)out + len; len += r->len_$name$+1;\n"
                      "    memcpy(out->$name$, r->$name$, r->len_$name$);\n"
                      "    out->$name$[r->len_$name$] = 0;\n"
+                      , "name", field->name());
+  } else if(field->type() == FieldDescriptor::TYPE_BYTES) {
+      printer->Print("    out->len_$name$ = size_$name$(r->$name$_data);\n"
+                     "    out->$name$ = (void *)out + len; len += out->len_$name$;\n"
+                     "    memcpy(out->$name$, r->$name$_data, out->len_$name$);\n"
                       , "name", field->name());
   } else {
       printer->Print("    out->$name$ = r->$name$;\n", "name", field->name());

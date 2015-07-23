@@ -148,7 +148,7 @@ void *allocate(Allocator *l, size_t len) {
         }
         l = l->next;
         need -= sizeof(Allocator);
-        l->sp = (void *)l + need;
+        l->sp = (void *)l + sizeof(Allocator);
         l->avail = need;
         l->next = NULL;
     }
@@ -163,12 +163,21 @@ int lint32_cmp(const void *a, const void *b) {
     return i-j;
 }
 
+//static void *no_copy(void *data, const void *a) {
+//    return (void *)a;
+//}
+
 // Assumes system is little-endian (else boff = 0 + ...)
 static const struct _fszmap dex;
 const rbop_t fszops = {
     .cmp = lint32_cmp,
     .coff = (void *)&(dex.left) - (void *)&dex,
+#ifdef BIGEND
+    .boff = 0 + (void *)&(dex.field) - (void *)&dex,
+#else
     .boff = 3 + (void *)&(dex.field) - (void *)&dex,
+#endif
+//    .copy = no_copy,
     .mask = 0x80,
     .nil = NULL,
 };
