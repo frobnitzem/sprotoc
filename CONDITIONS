@@ -1,0 +1,6 @@
+Conditions for Using Sprotoc:
+
+The distribution terms for sprotoc-generated protocol buffer code permit using the generated code in nonfree programs.
+
+The c-source code in sprotoc/ and include files in include/sprotoc are required for using the generated code, and have been released under an apache license.
+This exception applies when sprotoc is generating code for a protocol buffer parser or serializer.

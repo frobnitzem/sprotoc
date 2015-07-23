@@ -1,3 +1,26 @@
+/*    Copyright (C) David M. Rogers, 2015
+ *    
+ *    David M. Rogers <predictivestatmech@gmail.com>
+ *    Nonequilibrium Stat. Mech. Research Group
+ *    Department of Chemistry
+ *    University of South Florida
+ *
+ *    This file is part of sprotoc.
+ *
+ *    sprotoc is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    sprotoc is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with sprotoc.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/compiler/command_line_interface.h>
 #include <google/protobuf/compiler/cpp/cpp_generator.h>

@@ -1,5 +1,5 @@
 #!/bin/sh
-cd /Users/rogers/build/sprotoc/test
+cd /Users/rogers/src/sprotoc/test
 TESTS="test1"
 # end of test.sh (running the tests)
 

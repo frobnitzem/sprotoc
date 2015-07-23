@@ -1,7 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2014 David M. Rogers
+//
+// This file is a modified form of: http://code.google.com/p/protobuf/
+//  and has a less restricted license from the rest of sprotoc.
 // Copyright 2008 Google Inc.  All rights reserved.
-//   modified form of: http://code.google.com/p/protobuf/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are

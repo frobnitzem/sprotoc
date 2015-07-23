@@ -23,12 +23,14 @@ int main(int argc, char **argv) {
     Person *ret;
     size_t len;
     uint8_t *buf;
+    const uint8_t *pos;
     
     if( (buf = foo_Person_to_string(&len, &bob)) == NULL) {
         fprintf(stderr, "Error writing bob.\n");
         return 1;
     }
-    ret = read_foo_Person(buf, len, l);
+    pos = buf; // tracks current read position
+    ret = read_foo_Person(&pos, len, l);
     free(buf);
     if(ret == NULL) {
         return 1;

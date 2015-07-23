@@ -1,3 +1,26 @@
+/*    Copyright (C) David M. Rogers, 2015
+ *    
+ *    David M. Rogers <predictivestatmech@gmail.com>
+ *    Nonequilibrium Stat. Mech. Research Group
+ *    Department of Chemistry
+ *    University of South Florida
+ *
+ *    This file is part of sprotoc.
+ *
+ *    sprotoc is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    sprotoc is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with sprotoc.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 /* The source of the source. */
 #include <vector>
 #include <utility>
@@ -66,7 +89,7 @@ void declare_api(io::Printer *printer, const Descriptor *msg) {
       "                         MY_$full_name$ *a); // user \n"
       "MY_$full_name$ *protord_$full_name$(void *info,\n"
       "                         $full_name$ *r); // user \n"
-      "MY_$full_name$ *read_$full_name$(const uint8_t **buf,\n"
+      "MY_$full_name$ *read_$full_name$(uint8_t **buf,\n"
       "                         ssize_t sz, void *info);\n\n"
       //"static inline void init_$full_name$($full_name$ *r);\n"
       "struct _fszmap *size_$full_name$(Allocator *l,\n"
@@ -173,7 +196,7 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     "}\n");
 
     printer->Print(
-    "MY_$full_name$ *read_$full_name$(const uint8_t **buf, ssize_t sz, void *info) {\n"
+    "MY_$full_name$ *read_$full_name$(uint8_t **buf, ssize_t sz, void *info) {\n"
     "    $full_name$ r; // use the stack to store incoming object\n"
     "    //char strbuf[STRAL_SZ]; // and expanded repeated msg ptrs (TODO)\n"
     "    //Allocator *l = (Allocator *)strbuf;\n"
