@@ -29,6 +29,7 @@ clean:
 	make -C sprotoc-c clean
 
 $(SPROTOC): $(LIBS)
+	mkdir -p bin
 	$(LD) -o $@ $^ $(LDFLAGS)
 
 test/test.sh:	test $(LIBS) $(SPROTOC)
@@ -36,9 +37,11 @@ test/test.sh:	test $(LIBS) $(SPROTOC)
 	make -C test test.sh
 
 $(PWD)/lib/sprotoc.a:	sprotoc
+	mkdir -p lib
 	make -C sprotoc ../lib/sprotoc.a
 
 $(PWD)/lib/sprotoc-c.a:	sprotoc-c
+	mkdir -p lib
 	make -C sprotoc-c ../lib/sprotoc-c.a
 
 .c.o:
