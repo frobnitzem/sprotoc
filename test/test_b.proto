@@ -1,0 +1,7 @@
+package foo;
+
+message Person {
+  required bytes name = 1 [default = "unknown"];
+  repeated bytes args = 2;
+  optional bytes history = 3;
+}
