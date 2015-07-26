@@ -70,27 +70,25 @@ possible to skip parsing parts of a message.
 ### Lazy Byte Serialization
   One convention that deserves comment is the method of serializing 
 fields with type `bytes`.  These are serialized by filling in
-the protobuf structure with 2 functions,
+the protobuf structure with the function,
 ``` c
-  typedef size_t (*lazy_writer)(SWriter *print, void *buf);
-  typedef size_t (*lazy_size)(void *buf);
+  typedef void (*lazy_writer)(SWriter *print, void *buf, size_t len);
 ```
 The writer is then only called when writes are actually needed.
 
 the SWriter is defined in sprotoc.h, and is used like:
   print->write(print->stream, buf, len);
-You can create a writer following the generated [message]_to_string,
-functions.
 
 ## Features
 
-1. Example copy in/out functions can be generated for you.
-To do this, pass the stubs parameter to sprotoc:
+1. A complete example serialize / de-serialize program can
+be generated for you.  To do this, pass the stubs
+parameter to sprotoc:
 ``` sh
 sprotoc --c_out=stubs=stub:. test1.proto
 ```
 Building your copy functions by modifying these stubs
-will save you from having to look up any of the naming conventions.
+will save you from having to look up _any_ of the naming conventions.
 
 2. This implementation is as close to zero-copy as anyone could
 reasonably want.  Only the numbers in each message are copied into
