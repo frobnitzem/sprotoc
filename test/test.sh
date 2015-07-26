@@ -1,6 +1,6 @@
 #!/bin/sh
 cd /Users/rogers/src/sprotoc/test
-TESTS="test1"
+TESTS="test1 test_b"
 # end of test.sh (running the tests)
 
 fail=""

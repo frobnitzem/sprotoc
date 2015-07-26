@@ -334,6 +334,9 @@ string CFieldType(const FieldDescriptor *field) {
     case FieldDescriptor::CPPTYPE_MESSAGE:
             return "MY_" + DotsToUnderscores(field->message_type()->full_name()) + " *";
     case FieldDescriptor::CPPTYPE_STRING:
+            if(field->type() == FieldDescriptor::TYPE_BYTES) {
+                return "void *";
+            }
             return "char *";
     default:
             return CTName(field->type());

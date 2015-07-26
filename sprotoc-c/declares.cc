@@ -119,15 +119,21 @@ void declare_field(io::Printer *printer, const FieldDescriptor* field) {
         }
         return;
       case FieldDescriptor::CPPTYPE_STRING:
-        switch (field->options().ctype()) {
+        switch(field->type()) { //(field->options().ctype()) {
+          case FieldDescriptor::TYPE_BYTES:
+            printer->Print(
+                    "    int $rep$len_$name$;\n"
+                    "    void $rep$*$name$;\n"
+                    "    void (*write_$name$)(SWriter *print, void *buf, size_t len);\n"
+                    , "rep", repstar, "name", field->name());
+            return;
           default:  // RepeatedStringFieldGenerator handles unknown ctypes.
-          case FieldOptions::STRING:
-            printer->Print("    int $rep$len_$name$;\n",
-                      "rep", repstar,
-                      "name", field->name());
-            printer->Print("    char $rep$*$name$;\n",
-                      "rep", repstar,
-                      "name", field->name());
+          //case FieldOptions::STRING:
+          case FieldDescriptor::TYPE_STRING:
+            printer->Print(
+                    "    int $rep$len_$name$;\n"
+                    "    char $rep$*$name$;\n"
+                    , "rep", repstar, "name", field->name());
             return;
         }
       case FieldDescriptor::CPPTYPE_ENUM:
@@ -160,8 +166,7 @@ void declare_stackspace(io::Printer *printer, const FieldDescriptor *field) {
 
 void set_stackspace(io::Printer *printer, const FieldDescriptor *field) {
     if(field->is_repeated()) {
-        printer->Print("    r.$name$ = r_$name$;\n",
-                        "name", field->name());
+        printer->Print("    r.$name$ = r_$name$;\n", "name", field->name());
         if(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING)
             printer->Print("    r.len_$name$ = r_len_$name$;\n",
                            "name", field->name());

@@ -1,7 +1,7 @@
 CFLAGS += -ggdb
 LIBS = ../lib/sprotoc.a
 
-TESTS = test1
+TESTS = test1 test_b
 
 test.sh:	run_test.sh $(TESTS)
 	@( echo "#!/bin/sh" >test.sh; \
@@ -12,6 +12,10 @@ test.sh:	run_test.sh $(TESTS)
 
 test1:	test1.o test1.pb-c.o $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^
+
+test_b:	test_b.o test_b.pb-c.o $(LIBS)
+	$(LD) -o $@ $(LDFLAGS) $^
+
 
 distclean:	clean
 

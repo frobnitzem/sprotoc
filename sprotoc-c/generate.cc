@@ -278,8 +278,11 @@ void FileGenerator::GenerateStubSource(io::Printer* printer, string basename) {
     "\n"
     "    allocator_dtor(&l);\n"
     "    return 0;\n"
-    "}\n", "full_name",
-      DotsToUnderscores(file_->message_type(0)->full_name()));
+    "}\n\n"
+    "// Example write callback for serializing \"bytes\".\n"
+    "void simple_writer(SWriter *s, void *data, size_t len) {\n"
+    "        s->write(s->stream, data, len);\n"
+    "}\n","full_name", DotsToUnderscores(file_->message_type(0)->full_name()));
 
   for (int i = 0; i < file_->message_type_count(); i++) {
       gen_stub(printer, file_->message_type(i));

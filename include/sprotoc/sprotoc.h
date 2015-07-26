@@ -165,18 +165,6 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             sz += size_uint64(r.len_ ## name[i]) + r.len_ ## name[i]; \
         } \
     }
-#define SIZE_BYTES(name, wsz) { \
-            uint64_t i = r.name ## _size(r.name ## _data); \
-            sz += (wsz) + size_uint64(i) + i; }
-#define SIZE_REP_BYTES(name, wsz) { \
-    if(r.name != NULL && r.name ## _size != NULL && r.name ## _data != NULL) { \
-        int i; \
-        sz += (wsz) * r.n_ ## name; \
-        for(i=0; i<r.n_ ## name; i++) { \
-            uint64_t j = r.name ## _size(r.name ## _data[i]); \
-            sz += size_uint64(i) + j; \
-        } \
-    } }
 #define SIZE_MSG(type, name, wd, wsz) { \
         c = size_ ## type(l, r.name); \
         c->field = wd; \
@@ -236,16 +224,16 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
     }
 #define WRITE_BYTES(name, wd) { \
         write_uint32(s, (wd) << 3 | 2); \
-        write_uint64(s, r.name ## _size(r.name ## _data) ); \
-        r.name(s, r.name ## _data); \
+        write_uint64(s, r.len_ ## name); \
+        r.write_ ## name(s, r.name, r.len_ ## name); \
     }
-#define WRITE_REP_BYTES(name, wd) { \
-    if(r.name != NULL && r.name ## _size != NULL && r.name ## _data != NULL) { \
+#define WRITE_REP_BYTES(name, wd) \
+    if(r.name != NULL && r.write_ ## name != NULL) { \
         int i; \
         for(i=0; i<r.n_ ## name; i++) { \
             write_uint32(s, (wd) << 3 | 2); \
-            write_uint64(s, r.name ## _size(r.name ## _data[i]) ); \
-            r.name(s, r.name ## _data[i]); \
+            write_uint64(s, r.len_ ## name[i]); \
+            r.write_ ## name(s, r.name[i], r.len_ ## name[i]); \
         } \
     }
 
