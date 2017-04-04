@@ -124,7 +124,7 @@ void declare_field(io::Printer *printer, const FieldDescriptor* field) {
             printer->Print(
                     "    int $rep$len_$name$;\n"
                     "    void $rep$*$name$;\n"
-                    "    void (*write_$name$)(SWriter *print, void *buf, size_t len);\n"
+                    "    void (*write_$name$)(SWriter *print, const void *buf, size_t len);\n"
                     , "rep", repstar, "name", field->name());
             return;
           default:  // RepeatedStringFieldGenerator handles unknown ctypes.

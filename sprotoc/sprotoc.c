@@ -28,7 +28,7 @@
 
 /*
 // API helper functions (avoid caching sizes directly)
-int $full_name$_to_file(FILE *file, MY_$full_name$ *a) {
+int $full_name$_to_file(FILE *file, MY_$full_name$ *a, void *info) {
     Allocator *l = allocator_ctor();
     struct _fszmap *f;
     SWriter s = { .f = _swrite_to_file, .ptr = file };
@@ -41,7 +41,7 @@ int $full_name$_to_file(FILE *file, MY_$full_name$ *a) {
     allocator_dtor(&l);
     return ret;
 }
-char *$full_name$_to_string(size_t *len, MY_$full_name$ *a) {
+char *$full_name$_to_string(size_t *len, MY_$full_name$ *a, void *info) {
     Allocator *l = allocator_ctor();
     char *buf;
     struct _fszmap *f;
@@ -72,8 +72,8 @@ void _swrite_to_file(void *fin, const void *buf, size_t len) {
         if( (ret = write(fd, buf, len)) >= 0) {
             len -= ret;
         }
-    } while((ret <= 0 && (errno == EAGAIN || errno == EINTR))
-                    || len > 0);
+    } while(ret <= 0 && (errno == EAGAIN || errno == EINTR)
+          || ret > 0 && len > 0);
 }
 
 /*

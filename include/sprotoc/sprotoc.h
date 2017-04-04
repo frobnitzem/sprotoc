@@ -30,6 +30,9 @@ typedef struct {
     void (*write)(void *stream, const void *buf, size_t len);
     void *stream;
 } SWriter;
+static inline void *_stream_tell(void **spos) {
+    return *spos;
+}
 void _swrite_to_string(void *posin, const void *buf, size_t len);
 void _swrite_to_file(void *fin, const void *buf, size_t len);
 
@@ -56,40 +59,6 @@ struct allocator {
 Allocator *allocator_ctor();
 void allocator_dtor(Allocator **);
 void *allocate(Allocator *, size_t);
-
-// Primitive sizing functions
-static inline unsigned size_uint32(uint32_t);
-static inline unsigned size_int32(int32_t);
-static inline unsigned size_sint32(int32_t);
-static inline unsigned size_uint64(uint64_t);
-#define size_int64(v) size_uint64((uint64_t)(v))
-static inline unsigned size_sint64(int64_t);
-
-// Primitive writing functions
-static inline unsigned write_uint32(SWriter *, uint32_t);
-static inline unsigned write_sint32(SWriter *, int32_t);
-static inline unsigned write_int32(SWriter *, int32_t);
-static inline unsigned write_uint64(SWriter *, uint64_t);
-static inline unsigned write_sint64(SWriter *, int64_t);
-static inline unsigned write_int64(SWriter *, int64_t);
-static inline unsigned write_fixed32(SWriter *, uint32_t);
-static inline unsigned write_fixed64(SWriter *, uint64_t);
-static inline unsigned write_bool(SWriter *, unsigned);
-
-// Primitive reading functions
-#define read_fixed32(n, data, sz) read_fuint32((uint32_t *)n, data, sz)
-static inline unsigned read_fuint32(uint32_t *, const uint8_t *, size_t);
-static inline unsigned read_uint32(uint32_t *, const uint8_t *, size_t);
-static inline unsigned read_sint32(int32_t *, const uint8_t *, size_t);
-#define read_int32(n, data, sz) read_uint32((uint32_t *)n, data, sz)
-#define read_fixed64(n, data, sz) read_fuint64((uint64_t *)n, data, sz)
-static inline unsigned read_fuint64(uint64_t *, const uint8_t *, size_t);
-static inline unsigned read_uint64(uint64_t *, const uint8_t *, size_t);
-static inline unsigned read_sint64(int64_t *, const uint8_t *, size_t);
-#define read_int64(n, data, sz) read_uint64((uint64_t *)n, data, sz)
-static inline unsigned read_bool(unsigned *, const uint8_t *, size_t);
-
-static inline size_t skip_len(uint32_t tag, const uint8_t *, size_t);
 
 #include "proto_prim.h"
 
@@ -166,7 +135,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         } \
     }
 #define SIZE_MSG(type, name, wd, wsz) { \
-        c = size_ ## type(l, r.name); \
+        c = size_ ## type(l, r.name, user_info); \
         c->field = wd; \
         sz += c->len + wsz + size_uint64(c->len); \
         add_node((void **)(&f->sub), c, &fszops); \
@@ -177,7 +146,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         int i; \
         struct _fszmap *next; \
         for(i=0; i<r.n_ ## name; i++) { \
-            c = size_ ## type(l, r.name[i]); \
+            c = size_ ## type(l, r.name[i], user_info); \
             c->field = wd; \
             sz += c->len + wsz + size_uint64(c->len); \
             next = add_node((void **)(&f->sub), c, &fszops); \
@@ -223,17 +192,33 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         } \
     }
 #define WRITE_BYTES(name, wd) { \
+        void *_cur_pos; \
         write_uint32(s, (wd) << 3 | 2); \
         write_uint64(s, r.len_ ## name); \
+        _cur_pos = _stream_tell(s->stream); \
         r.write_ ## name(s, r.name, r.len_ ## name); \
+        if(r.len_ ## name != _stream_tell(s->stream) - _cur_pos) { \
+            fprintf(stderr, "Incorrect number of bytes written by %s (expected %d, got %ld)!\n", \
+                        #name, r.len_ ## name, _stream_tell(s->stream) - _cur_pos); \
+            *(void **)s->stream = _cur_pos + r.len_ ## name; \
+        } \
     }
 #define WRITE_REP_BYTES(name, wd) \
     if(r.name != NULL && r.write_ ## name != NULL) { \
         int i; \
+        void *_cur_pos; \
         for(i=0; i<r.n_ ## name; i++) { \
             write_uint32(s, (wd) << 3 | 2); \
             write_uint64(s, r.len_ ## name[i]); \
+            _cur_pos = _stream_tell(s->stream); \
             r.write_ ## name(s, r.name[i], r.len_ ## name[i]); \
+            if(r.len_ ## name != _stream_tell(s->stream) - _cur_pos) { \
+                fprintf(stderr, "Incorrect number of bytes written by %s[%d] " \
+                        "(expected %ld, got %ld)!\n", \
+                        #name, i, r.len_ ## name, _stream_tell(s->stream) - _cur_pos); \
+                *(void **)s->stream = _cur_pos + r.len_ ## name; \
+            } \
+            _cur_pos = _next; \
         } \
     }
 
@@ -243,7 +228,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         if(c == fszops.nil) goto err; \
         write_uint32(s, wd << 3 | 2); \
         write_uint64(s, c->len); \
-        if(write_ ## type(s, c, r.name)) return 1; \
+        if(write_ ## type(s, c, r.name, user_info)) return 1; \
     }
 // Writes repeated messages by reversing the size list in-place first.
 #define WRITE_REP_MSG(type, name, wd) \
@@ -262,7 +247,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             if(c == fszops.nil) goto err; \
             write_uint32(s, wd << 3 | 2); \
             write_uint64(s, c->len); \
-            if(write_ ## type(s, c, r.name[i])) return 1; \
+            if(write_ ## type(s, c, r.name[i], user_info)) return 1; \
             c = c->next; \
         } \
     }

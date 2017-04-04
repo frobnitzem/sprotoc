@@ -2,5 +2,6 @@
 *.a
 bin/sprotoc
 test/test1
+test/test_b
 *.pb-c.c
 *.pb-c.h

@@ -330,7 +330,7 @@ void generate_copy_in(io::Printer *printer, const FieldDescriptor* field) {
       } else if(field->type() == FieldDescriptor::TYPE_BYTES) {
           printer->Print("      out->len_$name$ = a->len_$name$;\n"
                          "      out->write_$name$ = "
-                     "(void (*)(SWriter *, void *, size_t))& simple_writer;\n"
+                 "(void (*)(SWriter *, const void *, size_t))& simple_writer;\n"
               , "name", field->name());
       }
       printer->Print(
@@ -358,7 +358,7 @@ void generate_copy_in(io::Printer *printer, const FieldDescriptor* field) {
   } else if(field->type() == FieldDescriptor::TYPE_BYTES) {
       printer->Print("    out->len_$name$ = a->len_$name$;\n"
                      "    out->write_$name$ = "
-                 "(void (*)(SWriter *, void *, size_t))& simple_writer;\n"
+                 "(void (*)(SWriter *, const void *, size_t))& simple_writer;\n"
               , "name", field->name());
   }
   printer->Print("    out->$name$ = a->$name$;\n", "name", field->name());

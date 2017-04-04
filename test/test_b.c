@@ -19,7 +19,8 @@ int main(int argc, char **argv) {
     uint8_t *buf, *pos;
     int i;
 
-    if( (buf = foo_Person_to_string(&len, &test)) == NULL) {
+    // sending NULL info (not used or needed here)
+    if( (buf = foo_Person_to_string(&len, &test, NULL)) == NULL) {
         fprintf(stderr, "Error writing test data.\n");
         return 1;
     }
@@ -44,11 +45,12 @@ int main(int argc, char **argv) {
 
 // -------------------------------------------------------------------
 
-void simple_writer(SWriter *s, void *data, size_t len) {
+void simple_writer(SWriter *s, const void *data, size_t len) {
     s->write(s->stream, data, len);
 }
 
-void protowr_foo_Person(foo_Person *out, MY_foo_Person *a) {
+// info is not used or needed here
+void protowr_foo_Person(foo_Person *out, MY_foo_Person *a, void *info) {
     int i;
     out->write_name = &simple_writer;
     out->len_name = a->name.len;

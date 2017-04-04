@@ -263,7 +263,7 @@ void FileGenerator::GenerateStubSource(io::Printer* printer, string basename) {
     "    size_t len;\n"
     "    uint8_t *buf, *pos;\n"
     "\n"
-    "    if( (buf = $full_name$_to_string(&len, &test)) == NULL) {\n"
+    "    if( (buf = $full_name$_to_string(&len, &test, NULL)) == NULL) {\n"
     "        fprintf(stderr, \"Error writing test data.\\n\");\n"
     "        return 1;\n"
     "    }\n"
@@ -280,7 +280,7 @@ void FileGenerator::GenerateStubSource(io::Printer* printer, string basename) {
     "    return 0;\n"
     "}\n\n"
     "// Example write callback for serializing \"bytes\".\n"
-    "void simple_writer(SWriter *s, void *data, size_t len) {\n"
+    "void simple_writer(SWriter *s, const void *data, size_t len) {\n"
     "        s->write(s->stream, data, len);\n"
     "}\n","full_name", DotsToUnderscores(file_->message_type(0)->full_name()));
 

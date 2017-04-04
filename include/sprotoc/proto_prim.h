@@ -19,6 +19,43 @@
  *
  */
 
+#ifndef _PROTO_PRIM_H
+#define _PROTO_PRIM_H
+
+// Primitive sizing functions
+static inline unsigned size_uint32(uint32_t);
+static inline unsigned size_int32(int32_t);
+static inline unsigned size_sint32(int32_t);
+static inline unsigned size_uint64(uint64_t);
+#define size_int64(v) size_uint64((uint64_t)(v))
+static inline unsigned size_sint64(int64_t);
+
+// Primitive writing functions
+static inline unsigned write_uint32(SWriter *, uint32_t);
+static inline unsigned write_sint32(SWriter *, int32_t);
+static inline unsigned write_int32(SWriter *, int32_t);
+static inline unsigned write_uint64(SWriter *, uint64_t);
+static inline unsigned write_sint64(SWriter *, int64_t);
+static inline unsigned write_int64(SWriter *, int64_t);
+static inline unsigned write_fixed32(SWriter *, uint32_t);
+static inline unsigned write_fixed64(SWriter *, uint64_t);
+static inline unsigned write_bool(SWriter *, unsigned);
+
+// Primitive reading functions
+#define read_fixed32(n, data, sz) read_fuint32((uint32_t *)n, data, sz)
+static inline unsigned read_fuint32(uint32_t *, const uint8_t *, size_t);
+static inline unsigned read_uint32(uint32_t *, const uint8_t *, size_t);
+static inline unsigned read_sint32(int32_t *, const uint8_t *, size_t);
+#define read_int32(n, data, sz) read_uint32((uint32_t *)n, data, sz)
+#define read_fixed64(n, data, sz) read_fuint64((uint64_t *)n, data, sz)
+static inline unsigned read_fuint64(uint64_t *, const uint8_t *, size_t);
+static inline unsigned read_uint64(uint64_t *, const uint8_t *, size_t);
+static inline unsigned read_sint64(int64_t *, const uint8_t *, size_t);
+#define read_int64(n, data, sz) read_uint64((uint64_t *)n, data, sz)
+static inline unsigned read_bool(unsigned *, const uint8_t *, size_t);
+
+static inline size_t skip_len(uint32_t tag, const uint8_t *, size_t);
+
 #include <string.h>
 
 // varint-size primitives
@@ -321,4 +358,4 @@ static inline size_t skip_len(uint32_t tag, const uint8_t *buf, size_t sz) {
             return sz;
         }
 }
-
+#endif

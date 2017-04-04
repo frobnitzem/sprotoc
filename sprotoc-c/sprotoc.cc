@@ -31,7 +31,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
   google::protobuf::compiler::CommandLineInterface cli;
 
-  cli.SetVersionInfo("C Language - v1.0");
+  cli.SetVersionInfo("C Language - v2.0");
 
   // Support generation of C++ source and headers.
   google::protobuf::compiler::cpp::CppGenerator cpp_generator;
