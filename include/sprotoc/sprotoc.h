@@ -198,7 +198,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         _cur_pos = _stream_tell(s->stream); \
         r.write_ ## name(s, r.name, r.len_ ## name); \
         if(r.len_ ## name != _stream_tell(s->stream) - _cur_pos) { \
-            fprintf(stderr, "Incorrect number of bytes written by %s (expected %d, got %ld)!\n", \
+            DEBUG_MSG("Incorrect number of bytes written by %s (expected %d, got %ld)!\n", \
                         #name, r.len_ ## name, _stream_tell(s->stream) - _cur_pos); \
             *(void **)s->stream = _cur_pos + r.len_ ## name; \
         } \
@@ -213,7 +213,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             _cur_pos = _stream_tell(s->stream); \
             r.write_ ## name(s, r.name[i], r.len_ ## name[i]); \
             if(r.len_ ## name != _stream_tell(s->stream) - _cur_pos) { \
-                fprintf(stderr, "Incorrect number of bytes written by %s[%d] " \
+                DEBUG_MSG("Incorrect number of bytes written by %s[%d] " \
                         "(expected %ld, got %ld)!\n", \
                         #name, i, r.len_ ## name, _stream_tell(s->stream) - _cur_pos); \
                 *(void **)s->stream = _cur_pos + r.len_ ## name; \
@@ -252,48 +252,57 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
         } \
     }
 
-
 // Read primitives.
-#define READ_PRIM(type, name) { \
+// (start with resize utility on repeated messages)
+#define CK_RESIZE(type, ptr, num, do_err) \
+    if((num) >= MAX_REPEATED && (num)%MAX_REPEATED == 0) { \
+        int p2 = (num) / MAX_REPEATED; \
+        if(((p2-1)&p2) == 0) { /* power of 2 */ \
+            type *u = malloc(((num)<<1)*sizeof(type)); \
+            if(!u) { DEBUG_MSG("memory error\n"); \
+                     do_err; } \
+            memcpy(u, ptr, (num)*sizeof(type)); \
+            if((num) != MAX_REPEATED) free(ptr); \
+            ptr = u; \
+        } \
+    }
+
+#define READ_PRIM(type, ctype, name) { \
         k = read_ ## type(&r.name, *buf, sz); \
         *buf += k; sz -= k; \
     }
-#define READ_REP_PRIM(type, name) \
-    if(r.n_ ## name < MAX_REPEATED) { \
+#define READ_REP_PRIM(type, ctype, name) { \
+        CK_RESIZE(ctype, r.name, r.n_ ## name, goto skip); \
         k = read_ ## type(&r.name[r.n_ ## name], *buf, sz); \
         *buf += k; sz -= k; \
         r.n_ ## name ++; \
-    } else { \
-        DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
-        goto skip; \
     }
-#define READ_REP_PACKED(type, name) { \
+
+#define READ_REP_PACKED(type, ctype, name) { \
         k = read_uint64(&n, *buf, sz); \
         *buf += k; sz -= k; \
         n = sz - n; \
         if(n < 0) sz = n = 0; \
         while(sz > n) { \
-            READ_REP_PRIM(type, name); \
+            READ_REP_PRIM(type, ctype, name); \
         } \
     }
 #define READ_STRING(name) { \
-    k = read_uint64(&n, *buf, sz); \
-    *buf += k; sz -= k; \
-    r.name = (char *)*buf; \
-    r.len_ ## name = n > sz ? sz : n; \
-    *buf += n; sz -= n; \
+        k = read_uint64(&n, *buf, sz); \
+        *buf += k; sz -= k; \
+        r.name = (char *)*buf; \
+        r.len_ ## name = n > sz ? sz : n; \
+        *buf += n; sz -= n; \
     }
-#define READ_REP_STRING(name) \
-    if(r.n_ ## name < MAX_REPEATED) { \
+#define READ_REP_STRING(name) { \
+        CK_RESIZE(int,    r.len_ ## name, r.n_ ## name, goto skip); \
+        CK_RESIZE(char *, r.name,         r.n_ ## name, goto skip); \
         k = read_uint64(&n, *buf, sz); \
         *buf += k; sz -= k; \
         r.name[r.n_ ## name] = (char *)*buf; \
         r.len_ ## name[r.n_ ## name] = n > sz ? sz : n; \
         *buf += n; sz -= n; \
         r.n_ ## name ++; \
-    } else { \
-        DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
-        goto skip; \
     }
 #define READ_MSG(type, name) { \
         k = read_uint64(&n, *buf, sz); \
@@ -302,8 +311,8 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             r.name = read_ ## type(buf, n, info); \
         sz -= n; \
     }
-#define READ_REP_MSG(type, name) \
-    if(r.n_ ## name < MAX_REPEATED) { \
+#define READ_REP_MSG(type, name) { \
+        CK_RESIZE(MY_ ## type *, r.name, r.n_ ## name, goto skip); \
         k = read_uint64(&n, *buf, sz); \
         *buf += k; sz -= k; \
         if(n <= sz && (r.name[r.n_ ## name] = read_ ## type(buf, n, info)) \
@@ -311,9 +320,6 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
             r.n_ ## name ++; \
         } \
         sz -= n; \
-    } else { \
-        DEBUG_MSG("name reached MAX_REPEATED elements\n"); \
-        goto skip; \
     }
 
 #endif

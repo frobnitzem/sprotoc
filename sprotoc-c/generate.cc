@@ -146,9 +146,10 @@ void FileGenerator::GenerateHeader(io::Printer* printer, string incname) {
     "\n// Maximum number of repetitions of a single field.\n"
     "#define MAX_REPEATED 32\n"
     "// For debugging imperfections in read/written messages.\n"
-    "#define DEBUG_MSG2(A,B,...) fprintf(stderr, #A \":\" "
-                                            "#B \" \" __VA_ARGS__)\n"
-    "#define DEBUG_MSG(...) DEBUG_MSG2(__FILE__, __LINE__, __VA_ARGS__)\n"
+    "#define QUOTE(str) #str\n"
+    "#define QEXP(str) QUOTE(str)\n"
+    "#define DEBUG_MSG(...) fprintf(stderr, __FILE__ \":\" QEXP(__LINE__) "
+                                            "\" \" __VA_ARGS__)\n"
     "// @@protoc_insertion_point(includes)\n\n");
 
   // Generate top-level enum definitions.

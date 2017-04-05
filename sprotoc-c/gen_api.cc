@@ -199,9 +199,7 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     printer->Print(
     "MY_$full_name$ *read_$full_name$(uint8_t **buf, ssize_t sz, void *info) {\n"
     "    $full_name$ r; // use the stack to store incoming object\n"
-    "    //char strbuf[STRAL_SZ]; // and expanded repeated msg ptrs (TODO)\n"
-    "    //Allocator *l = (Allocator *)strbuf;\n"
-    "    MY_$full_name$ *a;\n"
+    "    MY_$full_name$ *a = NULL;\n"
     "    unsigned k;\n"
     "    uint32_t tag;\n"
     "    uint64_t n;\n"
@@ -213,11 +211,8 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     for(int i = 0; i < msg->field_count(); i++) {
         set_stackspace(printer, msg->field(i));
     }
-    //"   enum $full_name$ *$name$[MAX_REPEATED];\n"
     printer->Print(
-    "\n    //l->sp = (void *)l + sizeof(Allocator);\n"
-    "    //l->avail = STRAL_SZ - sizeof(Allocator);\n"
-    "    //l->next = NULL\n"
+    "\n"
     "    init_$full_name$(&r);\n"
     "    while(sz > 0) {\n"
     "        k = read_uint32(&tag, *buf, sz);\n"
@@ -227,10 +222,6 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
             "full_name", DotsToUnderscores(msg->full_name()));
     for(int i = 0; i < msg->field_count(); i++) {
         generate_read_case(printer, msg->field(i));
-    //"        case 1:\n"
-    //"            if((tag & 7) != 0) goto skip; // check wire type for errors\n"
-    //"            READ_PRIM(uint32_t, &r.i);\n"
-    //"            has_i = 1;\n"
         printer->Print(
         "            continue;\n");
     }
@@ -240,15 +231,28 @@ void generate_api(io::Printer *printer, const Descriptor *msg) {
     "        k = skip_len(tag, *buf, sz);\n"
     "        *buf += k; sz -= k;\n"
     "    }\n"
-    "    if(sz != 0) {\n"
+    "    if(sz == 0) {\n"
+    "        a = protord_$full_name$(info, &r); // user's function call\n"
+    "    } else {\n"
     "err:\n"
     "        DEBUG_MSG(\"Read of $full_name$ failed.\\n\");\n"
-    "        return NULL;\n"
-    "    }\n\n"
-    "    a = protord_$full_name$(info, &r); // user's function call\n"
-    "    //if(l->next != NULL) allocator_dtor(&l->next);\n"
+    "    } // @generated\n",
+        "full_name", DotsToUnderscores(msg->full_name()));
+    for(int i = 0; i < msg->field_count(); i++) {
+        const FieldDescriptor *field = msg->field(i);
+        if(!field->is_repeated()) continue;
+        if(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
+            printer->Print("    if(r.$name$ != r_$name$) { free(r.$name$); "
+                                                     "free(r.len_$name$); }\n",
+                           "name", field->name());
+        } else {
+            printer->Print("    if(r.$name$ != r_$name$) free(r.$name$);\n", 
+                           "name", field->name());
+        }
+    }
+    printer->Print(
     "    return a;\n"
-    "}\n", "full_name", DotsToUnderscores(msg->full_name()));
+    "}\n");
 }
 
 // stub implementation

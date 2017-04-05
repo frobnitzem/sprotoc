@@ -179,8 +179,9 @@ void generate_read_case(io::Printer *printer, const FieldDescriptor* field) {
   if(field->is_repeated()) {
       if(field->is_packable() && field->options().packed()) {
           printer->Print("            if((tag & 7) != 2) goto skip;\n");
-          printer->Print("            READ_REP_PACKED($type$, $name$);\n",
+          printer->Print("            READ_REP_PACKED($type$, $ctype$, $name$);\n",
                         "type", GTName(field->type()),
+                        "ctype", CTName(field->type()),
                         "name", field->name());
           goto skip;
       } else {
@@ -234,9 +235,10 @@ void generate_read_case(io::Printer *printer, const FieldDescriptor* field) {
         break;
   //case FieldDescriptor::CPPTYPE_ENUM: // Note: enum range not validated.
   default: // primitive field
-        printer->Print("            $rt$_PRIM($type$, $name$);\n",
-                      "rt", read_type,
+        printer->Print("            $rt$_PRIM", "rt", read_type);
+        printer->Print("($type$, $ctype$, $name$);\n",
                       "type", GTName(field->type()),
+                      "ctype", CTName(field->type()),
                       "name", field->name());
         break;
   }

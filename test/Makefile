@@ -1,9 +1,9 @@
-CFLAGS += -ggdb
+CFLAGS += -ggdb -I../include
 LIBS = ../lib/sprotoc.a
 
 TESTS = test1 test_b
 
-test.sh:	run_test.sh $(TESTS)
+test.sh:	gens run_test.sh $(TESTS)
 	@( echo "#!/bin/sh" >test.sh; \
 	   echo "cd $(PWD)/test" >>test.sh; \
 	   echo "TESTS=\"$(TESTS)\"" >>test.sh; \
@@ -11,10 +11,10 @@ test.sh:	run_test.sh $(TESTS)
 	)
 
 test1:	test1.o test1.pb-c.o $(LIBS)
-	$(LD) -o $@ $(LDFLAGS) $^
+	$(GCC) -o $@ $(LDFLAGS) $^
 
 test_b:	test_b.o test_b.pb-c.o $(LIBS)
-	$(LD) -o $@ $(LDFLAGS) $^
+	$(GCC) -o $@ $(LDFLAGS) $^
 
 
 distclean:	clean
@@ -22,10 +22,9 @@ distclean:	clean
 clean:
 	rm -f *.o $(TESTS)
 
-gens:	$(PWD)/$(SPROTOC) *.proto
-	echo $(PWD)/$(SPROTOC)
+gens:	../bin/sprotoc *.proto
 	@( for i in $(TESTS); do \
-	    $(PWD)/$(SPROTOC) --c_out=. $$i.proto; \
+	    ../bin/sprotoc --c_out=. $$i.proto; \
 	    done; \
 	 )
 
