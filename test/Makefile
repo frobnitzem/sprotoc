@@ -11,10 +11,10 @@ test.sh:	gens run_test.sh $(TESTS)
 	)
 
 test1:	test1.o test1.pb-c.o $(LIBS)
-	$(GCC) -o $@ $(LDFLAGS) $^
+	$(CC) -o $@ $(LDFLAGS) $^
 
 test_b:	test_b.o test_b.pb-c.o $(LIBS)
-	$(GCC) -o $@ $(LDFLAGS) $^
+	$(CC) -o $@ $(LDFLAGS) $^
 
 
 distclean:	clean

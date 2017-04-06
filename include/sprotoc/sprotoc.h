@@ -206,17 +206,18 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
 #define WRITE_REP_BYTES(name, wd) \
     if(r.name != NULL && r.write_ ## name != NULL) { \
         int i; \
-        void *_cur_pos; \
+        void *_cur_pos, *_next; \
         for(i=0; i<r.n_ ## name; i++) { \
             write_uint32(s, (wd) << 3 | 2); \
             write_uint64(s, r.len_ ## name[i]); \
             _cur_pos = _stream_tell(s->stream); \
             r.write_ ## name(s, r.name[i], r.len_ ## name[i]); \
-            if(r.len_ ## name != _stream_tell(s->stream) - _cur_pos) { \
+            _next = _stream_tell(s->stream); \
+            if(r.len_ ## name[i] != _next - _cur_pos) { \
                 DEBUG_MSG("Incorrect number of bytes written by %s[%d] " \
-                        "(expected %ld, got %ld)!\n", \
-                        #name, i, r.len_ ## name, _stream_tell(s->stream) - _cur_pos); \
-                *(void **)s->stream = _cur_pos + r.len_ ## name; \
+                        "(expected %d, got %ld)!\n", \
+                        #name, i, r.len_ ## name[i], _next - _cur_pos); \
+                *(void **)s->stream = _cur_pos + r.len_ ## name[i]; \
             } \
             _cur_pos = _next; \
         } \
@@ -296,7 +297,7 @@ static inline size_t protosz_string(uint32_t wd, char *s) {
     }
 #define READ_REP_STRING(name) { \
         CK_RESIZE(int,    r.len_ ## name, r.n_ ## name, goto skip); \
-        CK_RESIZE(char *, r.name,         r.n_ ## name, goto skip); \
+        CK_RESIZE(void *, r.name,         r.n_ ## name, goto skip); \
         k = read_uint64(&n, *buf, sz); \
         *buf += k; sz -= k; \
         r.name[r.n_ ## name] = (char *)*buf; \
